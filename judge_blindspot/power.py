@@ -22,6 +22,42 @@ from .stats import _phi, bootstrap_ci
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Vectorized bootstrap for phi — avoids Python loop, ~20-50x faster
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _bootstrap_phi_ci_fast(
+    M: np.ndarray,
+    n_boot: int,
+    rng: np.random.Generator,
+    alpha: float = 0.05,
+) -> Tuple[float, float]:
+    """Vectorized percentile CI for phi. All n_boot resamples in one numpy call.
+
+    Replaces the generic bootstrap_ci (which has a Python for-loop) with a
+    batched matrix approach: sample indices shape (n_boot, n), then compute
+    phi across all rows simultaneously.
+    """
+    n = len(M)
+    # (n_boot, n) integer indices — one numpy call, no Python loop
+    idx = rng.integers(0, n, size=(n_boot, n))
+    # (n_boot, n, 2) — fancy indexing resamples all bootstraps at once
+    S = M[idx].astype(float)
+    A, B = S[:, :, 0], S[:, :, 1]              # each (n_boot, n)
+    A_m = A.mean(axis=1, keepdims=True)
+    B_m = B.mean(axis=1, keepdims=True)
+    A_s = A.std(axis=1)
+    B_s = B.std(axis=1)
+    valid = (A_s > 0) & (B_s > 0)
+    cov   = ((A - A_m) * (B - B_m)).mean(axis=1)
+    phi_v = np.where(valid, cov / np.where(valid, A_s * B_s, 1.0), np.nan)
+    clean = phi_v[~np.isnan(phi_v)]
+    if len(clean) < 10:
+        return (float("nan"), float("nan"))
+    return float(np.percentile(clean, 100 * alpha / 2)), \
+           float(np.percentile(clean, 100 * (1 - alpha / 2)))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Default pre-registered grid (written to experiment.yaml after run)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -122,13 +158,7 @@ def simulate_power(
 
     for _ in range(n_sims):
         M = _sample_matrix(n, probs, rng)
-        boot_seed = int(rng.integers(0, 2**31))
-        lo, hi = bootstrap_ci(
-            M,
-            lambda m: _phi(m[:, 0].astype(int), m[:, 1].astype(int)),
-            n_boot=n_boot,
-            seed=boot_seed,
-        )
+        lo, hi = _bootstrap_phi_ci_fast(M, n_boot, rng)
         if lo == lo and hi == hi:   # not nan
             hw_vals.append((hi - lo) / 2.0)
 

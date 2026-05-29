@@ -32,7 +32,7 @@ defect_classes:
   - swapped_args
 
 # target n per defect class (set after Phase 6 power analysis)
-target_n: 150  # set by Phase 6 power simulation
+target_n: 170  # set by Phase 6 power simulation
 
 seeds:
   corpus:    0
