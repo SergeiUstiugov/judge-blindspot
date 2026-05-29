@@ -1,0 +1,52 @@
+# experiment.yaml — single source of truth for all run parameters.
+# No hardcoded params in code; everything is read from here.
+
+models:
+  - id: gpt-4o-mini
+    provider: openai
+    decoding:
+      temperature: 0.0
+      max_tokens: 256
+      seed: 42
+  - id: gpt-4o
+    provider: openai
+    decoding:
+      temperature: 0.0
+      max_tokens: 256
+      seed: 42
+  - id: claude-haiku-4-5-20251001
+    provider: anthropic
+    decoding:
+      temperature: 0.0
+      max_tokens: 256
+
+prompt_templates:
+  strict_passfail: prompts/strict_passfail.txt
+  rubric:          prompts/rubric.txt
+  confidence:      prompts/confidence.txt
+
+defect_classes:
+  - off_by_one
+  - wrong_operator
+  - dropped_guard
+  - swapped_args
+
+# target n per defect class (set after Phase 6 power analysis)
+target_n: 120
+
+seeds:
+  corpus:    0
+  bootstrap: 0
+  judge_run: 42
+
+output_dir: results/
+
+budget:
+  max_api_calls: 10000
+  max_cost_usd:  50.0
+
+corpus:
+  correct_per_task:   1
+  defective_per_task: 2
+  # items with source date after this cutoff are considered uncontaminated
+  contamination_cutoff: "2024-06-01"
