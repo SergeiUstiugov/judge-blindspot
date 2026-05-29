@@ -56,8 +56,13 @@ def build_miss_matrix(
     corpus: list,
     results: Dict[str, list],
     defect_class: Optional[str] = None,
+    all_items: bool = False,
 ) -> tuple:
-    """Build binary miss matrix M[n_items, n_judges] for gt_label='defective' items.
+    """Build binary miss matrix M[n_items, n_judges].
+
+    By default (all_items=False) uses only gt_label='defective' items, per the
+    pre-registered analysis rule. Set all_items=True for calibration controls
+    where every wrong verdict (on either correct or defective items) counts.
 
     - Drops INVALID verdicts (NaN in float matrix; callers filter per pair).
     - Filters to defect_class if given (matches item.defect_type).
@@ -69,18 +74,21 @@ def build_miss_matrix(
     if defect_class is not None:
         items = [it for it in corpus if it.defect_type == defect_class]
 
-    # per the pre-registered rule: only defective items enter the miss matrix
-    defective = [it for it in items if it.gt_label == "defective"]
-    if not defective:
-        defective = items  # fallback for synthetic corpora without explicit gt
+    if all_items:
+        selected = list(items)
+    else:
+        # per the pre-registered rule: only defective items enter the miss matrix
+        selected = [it for it in items if it.gt_label == "defective"]
+        if not selected:
+            selected = list(items)  # fallback for synthetic corpora without explicit gt
 
-    item_ids = [it.item_id for it in defective]
+    item_ids = [it.item_id for it in selected]
     n, k = len(item_ids), len(judge_ids)
     M = np.full((n, k), fill_value=np.nan)
 
     for j_idx, judge_id in enumerate(judge_ids):
         by_item = {r.item_id: r for r in results[judge_id]}
-        for i_idx, item in enumerate(defective):
+        for i_idx, item in enumerate(selected):
             res = by_item.get(item.item_id)
             if res is not None:
                 val = res.miss(item.gt_label)

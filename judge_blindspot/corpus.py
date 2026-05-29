@@ -65,11 +65,13 @@ def verify_gt(item: CorpusItem) -> bool:
         code_path = Path(tmpdir) / "candidate.py"
         test_path = Path(tmpdir) / "test_candidate.py"
         code_path.write_text(item.candidate_code, encoding="utf-8")
-        # inject candidate module into the test file
+        # Register in sys.modules so 'from candidate import *' is deterministic
+        # regardless of whether pytest adds tmpdir to sys.path.
         preamble = (
-            "import sys, importlib.util\n"
-            f"_spec = importlib.util.spec_from_file_location('candidate', r'{code_path}')\n"
-            "_mod = importlib.util.module_from_spec(_spec)\n"
+            "import sys, importlib.util as _ilu\n"
+            f"_spec = _ilu.spec_from_file_location('candidate', r'{code_path}')\n"
+            "_mod = _ilu.module_from_spec(_spec)\n"
+            "sys.modules['candidate'] = _mod\n"
             "_spec.loader.exec_module(_mod)\n"
             "from candidate import *\n"
         )
