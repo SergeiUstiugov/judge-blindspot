@@ -3,4 +3,8 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 results/
+!results/power_sim/
+!results/power_sim/*.json
+!results/power_sim/*.md
 *.csv
+!results/power_sim/*.csv
