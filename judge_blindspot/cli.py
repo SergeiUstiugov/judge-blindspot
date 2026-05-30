@@ -120,29 +120,130 @@ def _run_build_corpus(smoke: bool, output: str) -> int:
         return 1
 
 
+# ─────────────────────────── judge spec parser ────────────────────────────────
+
+def _parse_judge_specs(
+    judges_spec: str,
+    prompt_template: str,
+    judge_seed: int,
+    api_key: str | None,
+) -> list:
+    """Parse --judges spec into exactly 2 Judge objects.
+
+    Format: comma-separated list of ``provider:model_id``.
+    Supported providers: ``mock``, ``ollama``, ``anthropic``.
+
+    Rules:
+    - ``mock`` → two MockJudges (seeds judge_seed and judge_seed+1).
+    - Single ``ollama:`` or ``anthropic:`` spec → intra-model pair; the second
+      judge gets a ``_clone`` suffix on its judge_id (same model + seed).
+    - Two specs → independent pair; identical model_ids get ``_0``/``_1`` suffix
+      to keep judge_ids unique in the results dict.
+
+    Raises ValueError on unknown providers, bad format, or wrong count.
+    """
+    from .mock_judges import MockJudge
+    from .judges import make_ollama_judge, make_anthropic_judge
+
+    if judges_spec == "mock":
+        return [
+            MockJudge(error_rate=0.25, seed=judge_seed,     judge_id="mock_0"),
+            MockJudge(error_rate=0.25, seed=judge_seed + 1, judge_id="mock_1"),
+        ]
+
+    parts = [p.strip() for p in judges_spec.split(",") if p.strip()]
+    if not parts or len(parts) > 2:
+        raise ValueError(
+            f"Need 1 or 2 judge specs (got {len(parts)}). "
+            "Format: provider:model_id[,provider:model_id]"
+        )
+
+    def _make_one(spec: str, suffix: str) -> object:
+        if ":" not in spec:
+            raise ValueError(
+                f"Bad judge spec {spec!r}. Expected format: provider:model_id"
+            )
+        provider, model_id = spec.split(":", 1)
+        provider = provider.lower()
+        if provider == "ollama":
+            return make_ollama_judge(
+                model_id, prompt_template,
+                decoding={"temperature": 0.0, "max_tokens": 256, "seed": judge_seed},
+                judge_id_suffix=suffix,
+            )
+        if provider == "anthropic":
+            return make_anthropic_judge(
+                model_id, prompt_template,
+                api_key=api_key,
+                judge_id_suffix=suffix,
+            )
+        raise ValueError(
+            f"Unknown provider {provider!r}. Supported: mock, ollama, anthropic"
+        )
+
+    if len(parts) == 1:
+        return [_make_one(parts[0], ""), _make_one(parts[0], "_clone")]
+
+    # Two specs: add _0/_1 only when they would produce identical judge_ids.
+    j0 = _make_one(parts[0], "")
+    j1 = _make_one(parts[1], "")
+    if j0.judge_id == j1.judge_id:
+        j0 = _make_one(parts[0], "_0")
+        j1 = _make_one(parts[1], "_1")
+    return [j0, j1]
+
+
 # ─────────────────────────── run ─────────────────────────────────────────────
 
-def _run_pipeline(corpus_path: str, judges_spec: str, out_dir: str,
-                  defect_class: str | None, dry_run: bool, force: bool,
-                  n_boot: int, seed: int) -> int:
+def _run_pipeline(
+    corpus_path: str,
+    judges_spec: str,
+    out_dir: str,
+    defect_class: str | None,
+    dry_run: bool,
+    force: bool,
+    n_boot: int,
+    seed: int,
+    prompt_path: str,
+    api_key: str | None,
+    judge_seed: int,
+) -> int:
     from .corpus import load_corpus
     from .runner import run_judges, build_miss_matrix
     from .report import save_results, save_tables_md, save_forest_plot, save_manifest
+    from .judges import load_prompt, is_ollama_available
     import datetime
 
+    # Load prompt template (not needed for mock)
+    prompt_template = ""
     if judges_spec != "mock":
-        print(f"Only --judges mock is supported until Phase 2 (real LLM).")
+        try:
+            prompt_template = load_prompt(prompt_path)
+        except FileNotFoundError:
+            print(f"ERROR: prompt file not found: {prompt_path}")
+            return 1
+
+    # Pre-flight: Ollama availability
+    if "ollama:" in judges_spec:
+        if not is_ollama_available():
+            print("ERROR: Ollama server not reachable. Start it with: ollama serve")
+            return 1
+
+    try:
+        judges = _parse_judge_specs(judges_spec, prompt_template, judge_seed, api_key)
+    except ValueError as exc:
+        print(f"ERROR: {exc}")
         return 1
 
     corpus = load_corpus(corpus_path)
-    from .mock_judges import MockJudge
-    judges = [
-        MockJudge(error_rate=0.25, seed=0, judge_id="mock_0"),
-        MockJudge(error_rate=0.25, seed=1, judge_id="mock_1"),
-    ]
-
     out = Path(out_dir)
-    results = run_judges(corpus, judges, out / "logs", dry_run=dry_run, force=force)
+
+    n_calls = len(corpus) * len(judges)
+    print(f"[info] corpus={len(corpus)}  judges={[j.judge_id for j in judges]}")
+    print(f"[info] planned calls: {n_calls}")
+
+    results = run_judges(corpus, judges, out / "logs", dry_run=dry_run,
+                         budget_calls=None, force=force)
     if dry_run:
         return 0
 
@@ -161,22 +262,25 @@ def _run_pipeline(corpus_path: str, judges_spec: str, out_dir: str,
     label = defect_class or "all"
     save_results(pairwise, out, label)
     save_tables_md(pairwise, out, label)
-    fp = save_forest_plot(pairwise, out, label)
+    save_forest_plot(pairwise, out, label)
     manifest = {
-        "corpus": corpus_path,
-        "judges": [j.judge_id for j in judges],
-        "n_items": len(corpus),
-        "n_valid": int(n),
+        "corpus":       corpus_path,
+        "judges":       [j.judge_id for j in judges],
+        "judges_spec":  judges_spec,
+        "prompt_path":  prompt_path,
+        "n_items":      len(corpus),
+        "n_valid":      int(n),
         "defect_class": label,
-        "n_boot": n_boot,
-        "seed": seed,
-        "ts": datetime.datetime.utcnow().isoformat(),
+        "n_boot":       n_boot,
+        "seed":         seed,
+        "judge_seed":   judge_seed,
+        "ts":           datetime.datetime.utcnow().isoformat(),
     }
     save_manifest(manifest, out)
 
     print(f"\nResults saved to {out}/")
     for pair, p in pairwise.items():
-        v = p.get("verdict", "?")
+        v   = p.get("verdict", "?")
         phi_s = f"{p['phi']:+.3f}" if p["phi"] == p["phi"] else "nan"
         print(f"  {pair}: phi={phi_s}  verdict={v}  n={p['n']}")
 
@@ -294,14 +398,31 @@ def main(argv=None) -> None:
     bc.add_argument("--output", default="data/synthetic_smoke.jsonl")
 
     run_p = sub.add_parser("run", help="run judges on corpus and compute pairwise stats")
-    run_p.add_argument("--corpus",  required=True, help="path to corpus JSONL")
-    run_p.add_argument("--judges",  default="mock", help="mock | <future: model list>")
-    run_p.add_argument("--class",   dest="defect_class", default=None)
-    run_p.add_argument("--out",     default="results/")
-    run_p.add_argument("--dry-run", action="store_true")
-    run_p.add_argument("--force",   action="store_true")
-    run_p.add_argument("--n-boot",  type=int, default=500)
-    run_p.add_argument("--seed",    type=int, default=0)
+    run_p.add_argument("--corpus",     required=True, help="path to corpus JSONL")
+    run_p.add_argument(
+        "--judges", default="mock",
+        help=(
+            "Judge spec(s). Examples:\n"
+            "  mock                                      (two deterministic mocks)\n"
+            "  ollama:llama3.1:8b                        (intra-model pair, same seed)\n"
+            "  ollama:llama3.1:8b,ollama:mistral:7b      (two Ollama models)\n"
+            "  anthropic:claude-haiku-4-5-20251001,anthropic:claude-sonnet-4-6\n"
+            "  ollama:llama3.1:8b,anthropic:claude-haiku-4-5-20251001  (cross-type)"
+        ),
+    )
+    run_p.add_argument("--prompt",     default="prompts/strict_passfail.txt",
+                       help="path to judging prompt template (default: prompts/strict_passfail.txt)")
+    run_p.add_argument("--api-key",    dest="api_key", default=None,
+                       help="Anthropic API key (default: $ANTHROPIC_API_KEY env var)")
+    run_p.add_argument("--judge-seed", dest="judge_seed", type=int, default=42,
+                       help="seed for Ollama deterministic output (default: 42)")
+    run_p.add_argument("--class",      dest="defect_class", default=None)
+    run_p.add_argument("--out",        default="results/")
+    run_p.add_argument("--dry-run",    action="store_true")
+    run_p.add_argument("--force",      action="store_true")
+    run_p.add_argument("--n-boot",     type=int, default=500)
+    run_p.add_argument("--seed",       type=int, default=0,
+                       help="bootstrap seed (default: 0)")
 
     cal_p = sub.add_parser("calibrate", help="Phase 5 calibration gate (run before Table 3)")
     cal_p.add_argument("--corpus",        required=True)
@@ -332,6 +453,7 @@ def main(argv=None) -> None:
         sys.exit(_run_pipeline(
             a.corpus, a.judges, a.out, a.defect_class,
             a.dry_run, a.force, a.n_boot, a.seed,
+            a.prompt, a.api_key, a.judge_seed,
         ))
 
     if a.cmd == "calibrate":

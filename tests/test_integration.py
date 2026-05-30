@@ -167,7 +167,9 @@ def test_cli_run_command(tmp_path):
     save_corpus(corpus, corpus_path)
     from judge_blindspot.cli import _run_pipeline
     rc = _run_pipeline(str(corpus_path), "mock", str(tmp_path / "out"),
-                       None, False, True, 100, 0)
+                       None, False, True, 100, 0,
+                       prompt_path="prompts/strict_passfail.txt",
+                       api_key=None, judge_seed=42)
     assert rc == 0
     assert (tmp_path / "out" / "results_all.json").exists()
     assert (tmp_path / "out" / "tables_all.md").exists()
