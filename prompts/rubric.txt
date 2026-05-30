@@ -1,0 +1,21 @@
+You are reviewing a Python implementation for correctness.
+
+Problem specification:
+{spec}
+
+Implementation to review:
+{candidate_code}
+
+Evaluate the implementation against each criterion and write YES or NO:
+
+1. Main logic — correctly implements the core algorithm for typical inputs
+2. Boundary handling — correctly handles edge cases (empty input, single
+   element, boundary values)
+3. Return value — always returns the correct value and type in every case
+
+After your rubric, your response must end with exactly one of these two
+lines — no other text after it:
+VERDICT: PASS
+VERDICT: FAIL
+
+Use PASS if all three criteria are YES. Use FAIL if any criterion is NO.

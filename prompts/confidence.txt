@@ -1,0 +1,24 @@
+You are reviewing a Python implementation for correctness.
+
+Problem specification:
+{spec}
+
+Implementation to review:
+{candidate_code}
+
+First, list any potential issues you notice in the implementation.
+Then rate your confidence that the implementation is fully correct:
+  5 = certain it is correct
+  4 = likely correct, minor doubts
+  3 = uncertain — could go either way
+  2 = likely incorrect
+  1 = certain it is wrong
+
+After your analysis, your response must end with these two lines in order
+— no other text after them:
+Confidence: [1-5]
+VERDICT: PASS
+VERDICT: FAIL
+
+Use PASS if your confidence is 3 or above. Use FAIL if your confidence is
+2 or below.

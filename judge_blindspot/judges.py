@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 
@@ -56,12 +57,26 @@ class JudgeResult:
         return 1 if self.verdict == VERDICT_FAIL else 0
 
 
+def load_prompt(path: str | Path) -> str:
+    """Load a prompt template from a file. Placeholders: {spec}, {candidate_code}."""
+    return Path(path).read_text(encoding="utf-8")
+
+
 def _prompt_hash(template: str) -> str:
     return hashlib.sha256(template.encode()).hexdigest()[:12]
 
 
+def _apply_template(template: str, spec: str, candidate_code: str) -> str:
+    """Substitute {spec} and {candidate_code} without calling .format().
+
+    .format() would fail if candidate_code contains { } (dict literals, f-strings,
+    set comprehensions). Plain .replace() is safe and unambiguous.
+    """
+    return template.replace("{spec}", spec).replace("{candidate_code}", candidate_code)
+
+
 def _parse_verdict(raw: str) -> str:
-    """Extract PASS/FAIL from 'VERDICT: PASS' or 'VERDICT: FAIL' in the last lines."""
+    """Extract PASS/FAIL scanning lines from the end; first VERDICT: line wins."""
     for line in reversed(raw.strip().splitlines()):
         stripped = line.strip()
         if stripped.upper().startswith("VERDICT:"):
@@ -96,9 +111,7 @@ class Judge:
 
     def judge(self, item) -> JudgeResult:
         """Judge one CorpusItem. Retries once on INVALID, then records as INVALID."""
-        prompt = self.prompt_template.format(
-            spec=item.spec, candidate_code=item.candidate_code
-        )
+        prompt = _apply_template(self.prompt_template, item.spec, item.candidate_code)
         seed = self.decoding.get("seed", 0)
         for attempt in range(self.max_retries + 1):
             t0 = time.monotonic()

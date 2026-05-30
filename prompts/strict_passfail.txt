@@ -1,0 +1,18 @@
+You are reviewing a Python implementation for correctness.
+
+Problem specification:
+{spec}
+
+Implementation to review:
+{candidate_code}
+
+Determine whether this implementation is correct or contains a defect.
+Think step by step: check the main logic, edge cases (empty input, boundary
+values, off-by-one errors), and return values.
+
+Your response must end with exactly one of these two lines — no other text after it:
+VERDICT: PASS
+VERDICT: FAIL
+
+Use PASS if the implementation is correct for all inputs described in the
+specification. Use FAIL if it contains any defect.
