@@ -1,29 +1,67 @@
 # experiment.yaml — single source of truth for all run parameters.
 # No hardcoded params in code; everything is read from here.
 
+# ── Three measurement axes ────────────────────────────────────────────────────
+#
+# intra-model  : same model, two independent runs with fixed seed
+#                → expected phi ≈ +1 (positive control / H1)
+#                REQUIRES a local model (cloud APIs do not guarantee seed reproducibility)
+#
+# inter-capability : Haiku vs Sonnet (same provider, different capability tier)
+#                → H2: expect 0.2 < phi < 0.7 (shared training → shared blind spots)
+#
+# cross-type   : LLM judge vs deterministic test runner
+#                → H3: expect phi ≈ 0 (structurally orthogonal)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
 models:
-  - id: gpt-4o-mini
-    provider: openai
+
+  # --- intra-model axis: local model with fixed seed ---
+  # Replace 'local/llama-3-8b' with the actual model path / id you use.
+  # Must support deterministic output with seed (llama-cpp-python or vLLM).
+  - id: local/llama-3-8b
+    provider: local
+    axis: intra_model
     decoding:
       temperature: 0.0
-      max_tokens: 256
+      max_tokens:  256
       seed: 42
-  - id: gpt-4o
-    provider: openai
-    decoding:
-      temperature: 0.0
-      max_tokens: 256
-      seed: 42
+
+  # --- inter-capability axis: Haiku vs Sonnet ---
   - id: claude-haiku-4-5-20251001
     provider: anthropic
+    axis: inter_capability
     decoding:
       temperature: 0.0
-      max_tokens: 256
+      max_tokens:  256
+
+  - id: claude-sonnet-4-6
+    provider: anthropic
+    axis: inter_capability
+    decoding:
+      temperature: 0.0
+      max_tokens:  256
+
+  # --- cross-type axis: LLM vs deterministic test runner ---
+  # The test runner is not listed here — it uses the hidden_tests from the corpus
+  # and always returns 0 miss (it IS the ground truth by construction).
+  # In practice: pair claude-haiku-4-5 against a lightweight static checker
+  # (e.g. pylint narrowed to the defect class) to get a meaningful phi ≈ 0.
+  - id: claude-haiku-4-5-20251001
+    provider: anthropic
+    axis: cross_type
+    decoding:
+      temperature: 0.0
+      max_tokens:  256
 
 prompt_templates:
-  strict_passfail: prompts/strict_passfail.txt
-  rubric:          prompts/rubric.txt
-  confidence:      prompts/confidence.txt
+  strict_passfail: prompts/strict_passfail.txt   # main — Phase 2
+  rubric:          prompts/rubric.txt             # Phase 7 variant 2
+  confidence:      prompts/confidence.txt         # Phase 7 variant 3
+
+# Default prompt for Phase 2 runs
+default_prompt: strict_passfail
 
 defect_classes:
   - off_by_one
@@ -31,8 +69,8 @@ defect_classes:
   - dropped_guard
   - swapped_args
 
-# target n per defect class (set after Phase 6 power analysis)
-target_n: 170  # set by Phase 6 power simulation
+# target n per defect class — set by Phase 6 power simulation (2026-05-30)
+target_n: 170
 
 seeds:
   corpus:    0
@@ -48,5 +86,9 @@ budget:
 corpus:
   correct_per_task:   1
   defective_per_task: 2
-  # items with source date after this cutoff are considered uncontaminated
   contamination_cutoff: "2024-06-01"
+
+# ── Reproducibility note ──────────────────────────────────────────────────────
+# Cloud Anthropic API: temperature=0 reduces variance but does NOT guarantee
+# identical outputs across calls. For the intra-model axis use the local model.
+# Log every call to results/logs/ (model_id, seed, prompt_hash, raw_output, ts).
