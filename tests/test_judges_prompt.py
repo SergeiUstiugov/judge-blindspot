@@ -122,6 +122,28 @@ def test_parse_verdict_takes_last_occurrence():
     assert _parse_verdict(raw) == VERDICT_PASS
 
 
+# ── markdown-decorated verdict lines (regression for pilot bug) ───────────────
+
+def test_parse_verdict_markdown_bold():
+    assert _parse_verdict("some reasoning\n**VERDICT: PASS**") == VERDICT_PASS
+
+
+def test_parse_verdict_plain_fail():
+    assert _parse_verdict("VERDICT: FAIL") == VERDICT_FAIL
+
+
+def test_parse_verdict_leading_spaces_lowercase():
+    assert _parse_verdict("  verdict: pass") == VERDICT_PASS
+
+
+def test_parse_verdict_markdown_heading():
+    assert _parse_verdict("analysis\n### VERDICT: PASS") == VERDICT_PASS
+
+
+def test_parse_verdict_no_verdict_line():
+    assert _parse_verdict("The solution looks correct.") == VERDICT_INVALID
+
+
 # ── round-trip: load prompt → apply template → parse verdict ──────────────────
 
 def test_round_trip_strict_passfail():

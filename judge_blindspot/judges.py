@@ -82,9 +82,9 @@ def _apply_template(template: str, spec: str, candidate_code: str) -> str:
 def _parse_verdict(raw: str) -> str:
     """Extract PASS/FAIL scanning lines from the end; first VERDICT: line wins."""
     for line in reversed(raw.strip().splitlines()):
-        stripped = line.strip()
-        if stripped.upper().startswith("VERDICT:"):
-            token = stripped.split(":", 1)[1].strip().upper()
+        cleaned = line.strip().lstrip("*#`- ").rstrip("*#`- ")
+        if cleaned.upper().startswith("VERDICT:"):
+            token = cleaned.split(":", 1)[1].strip().upper()
             if token in (VERDICT_PASS, VERDICT_FAIL):
                 return token
     return VERDICT_INVALID
