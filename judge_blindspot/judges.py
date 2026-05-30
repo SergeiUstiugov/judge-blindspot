@@ -4,10 +4,14 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import hashlib
+import json
+import os
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 
 VERDICT_PASS    = "PASS"
@@ -133,3 +137,199 @@ class Judge:
             model_id=self.model_id,
             decoding_params=dict(self.decoding),
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ollama adapter — local LLM, zero API cost, deterministic seed
+# ─────────────────────────────────────────────────────────────────────────────
+
+OLLAMA_DEFAULT_HOST = "http://localhost:11434"
+
+
+def _ollama_call(
+    prompt: str,
+    decoding: dict,
+    seed: int,
+    model_id: str,
+    host: str = OLLAMA_DEFAULT_HOST,
+    timeout: int = 120,
+) -> Tuple[str, None]:
+    """POST to ollama /api/generate. Returns (raw_text, None).
+
+    Uses stdlib urllib — no extra dependencies.
+    Raises urllib.error.URLError if ollama is not running.
+    """
+    payload = {
+        "model":  model_id,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": float(decoding.get("temperature", 0.0)),
+            "seed":        int(seed),
+            "num_predict": int(decoding.get("max_tokens", 256)),
+        },
+    }
+    req = urllib.request.Request(
+        f"{host}/api/generate",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    return body.get("response", ""), None
+
+
+def is_ollama_available(host: str = OLLAMA_DEFAULT_HOST, timeout: int = 3) -> bool:
+    """Return True if ollama server is reachable."""
+    try:
+        with urllib.request.urlopen(f"{host}/api/tags", timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def list_ollama_models(host: str = OLLAMA_DEFAULT_HOST) -> List[str]:
+    """Return list of model names available in local ollama."""
+    try:
+        with urllib.request.urlopen(f"{host}/api/tags", timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return [m["name"] for m in data.get("models", [])]
+    except Exception:
+        return []
+
+
+def make_ollama_judge(
+    model_id: str,
+    prompt_template: str,
+    decoding: Optional[dict] = None,
+    host: str = OLLAMA_DEFAULT_HOST,
+    max_retries: int = 1,
+    judge_id_suffix: str = "",
+) -> Judge:
+    """Factory: create a Judge backed by a local ollama model.
+
+    Two judges with the same model_id and seed will produce identical verdicts
+    (deterministic seed support in ollama) — use this for the intra-model axis.
+    Different models give the inter-family axis.
+
+    Example — intra-model positive control:
+        ja = make_ollama_judge("llama3.1:8b", prompt, decoding={"seed": 42})
+        jb = make_ollama_judge("llama3.1:8b", prompt, decoding={"seed": 42},
+                               judge_id_suffix="_clone")
+        # ja and jb should produce phi ≈ +1
+
+    Example — inter-family:
+        ja = make_ollama_judge("llama3.1:8b",  prompt)
+        jb = make_ollama_judge("mistral:7b",   prompt)
+    """
+    if decoding is None:
+        decoding = {"temperature": 0.0, "max_tokens": 256, "seed": 42}
+
+    def call_fn(prompt_text: str, dec: dict, seed: int) -> Tuple[str, None]:
+        return _ollama_call(prompt_text, dec, seed, model_id=model_id, host=host)
+
+    judge = Judge(
+        model_id=model_id,
+        decoding=dict(decoding),
+        prompt_template=prompt_template,
+        call_fn=call_fn,
+        max_retries=max_retries,
+    )
+    if judge_id_suffix:
+        judge.judge_id = f"{model_id}{judge_id_suffix}:{judge.prompt_hash}"
+    return judge
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Anthropic adapter — Messages API, zero extra dependencies (stdlib urllib)
+# ─────────────────────────────────────────────────────────────────────────────
+
+ANTHROPIC_API_BASE    = "https://api.anthropic.com"
+ANTHROPIC_API_VERSION = "2023-06-01"
+
+
+def _anthropic_call(
+    prompt: str,
+    decoding: dict,
+    seed: int,
+    model_id: str,
+    api_key: str,
+    timeout: int = 60,
+) -> Tuple[str, None]:
+    """POST to Anthropic Messages API. Returns (raw_text, None).
+
+    seed is recorded in JudgeResult but not forwarded — Anthropic API does not
+    support deterministic seed. Use temperature=0.0 to minimise variance.
+    Raises urllib.error.HTTPError on API errors (4xx/5xx).
+    """
+    payload: dict = {
+        "model":      model_id,
+        "max_tokens": int(decoding.get("max_tokens", 256)),
+        "messages":   [{"role": "user", "content": prompt}],
+    }
+    temp = float(decoding.get("temperature", 0.0))
+    if temp > 0.0:
+        payload["temperature"] = temp
+    headers = {
+        "Content-Type":      "application/json",
+        "x-api-key":         api_key,
+        "anthropic-version": ANTHROPIC_API_VERSION,
+    }
+    req = urllib.request.Request(
+        f"{ANTHROPIC_API_BASE}/v1/messages",
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    raw = body["content"][0]["text"]
+    return raw, None
+
+
+def make_anthropic_judge(
+    model_id: str,
+    prompt_template: str,
+    decoding: Optional[dict] = None,
+    api_key: Optional[str] = None,
+    max_retries: int = 1,
+    judge_id_suffix: str = "",
+) -> Judge:
+    """Factory: create a Judge backed by the Anthropic Messages API.
+
+    Uses stdlib urllib — no anthropic-sdk dependency required.
+    Reads ANTHROPIC_API_KEY from the environment when api_key is not given.
+
+    Note on determinism: Anthropic API does not guarantee identical outputs
+    across calls even at temperature=0. Do NOT use this for the intra-model
+    positive control (which needs bit-identical output via fixed seed).
+    Use it for the inter-capability and cross-type axes only.
+
+    Example — inter-capability axis:
+        haiku  = make_anthropic_judge("claude-haiku-4-5-20251001", prompt)
+        sonnet = make_anthropic_judge("claude-sonnet-4-6",          prompt)
+    """
+    if api_key is None:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError(
+            "Anthropic API key required. "
+            "Set ANTHROPIC_API_KEY env var or pass api_key=."
+        )
+    if decoding is None:
+        decoding = {"temperature": 0.0, "max_tokens": 256}
+
+    def call_fn(prompt_text: str, dec: dict, seed: int) -> Tuple[str, None]:
+        return _anthropic_call(prompt_text, dec, seed, model_id=model_id, api_key=api_key)
+
+    judge = Judge(
+        model_id=model_id,
+        decoding=dict(decoding),
+        prompt_template=prompt_template,
+        call_fn=call_fn,
+        max_retries=max_retries,
+    )
+    if judge_id_suffix:
+        judge.judge_id = f"{model_id}{judge_id_suffix}:{judge.prompt_hash}"
+    return judge
