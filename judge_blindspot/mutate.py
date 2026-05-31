@@ -48,7 +48,7 @@ def _run_tests(source: str, hidden_tests: str) -> Tuple[bool, str]:
         test_path.write_text(preamble + hidden_tests, encoding="utf-8")
         result = subprocess.run(
             [sys.executable, "-m", "pytest", str(test_path), "-x", "-q", "--tb=no"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=15,
         )
     return result.returncode == 0, result.stderr
 
