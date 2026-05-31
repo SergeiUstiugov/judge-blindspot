@@ -106,18 +106,35 @@ def _run_doctor() -> int:
 
 # ─────────────────────────── build-corpus ────────────────────────────────────
 
-def _run_build_corpus(smoke: bool, output: str) -> int:
-    if not smoke:
-        print("Specify --smoke to build the synthetic smoke corpus.")
+def _run_build_corpus(smoke: bool, full: bool, output: str) -> int:
+    if smoke and full:
+        print("Specify either --smoke or --full, not both.")
         return 1
-    from .smoke_corpus import build_smoke_corpus
-    try:
-        stats = build_smoke_corpus(output_path=output, verbose=True)
-        print(f"\nBuild complete. Stats: {stats}")
-        return 0
-    except Exception as e:
-        print(f"ERROR: {e}")
-        return 1
+    if smoke:
+        from .smoke_corpus import build_smoke_corpus
+        try:
+            stats = build_smoke_corpus(output_path=output, verbose=True)
+            print(f"\nBuild complete. Stats: {stats}")
+            return 0
+        except Exception as e:
+            print(f"ERROR: {e}")
+            return 1
+    if full:
+        from .full_corpus import build_full_corpus
+        try:
+            stats = build_full_corpus(output_path=output, verbose=True)
+            if stats["task_errors"]:
+                print(f"\nWARNING: {len(stats['task_errors'])} task errors:")
+                for err in stats["task_errors"]:
+                    print(f"  {err}")
+            return 0
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"ERROR: {e}")
+            return 1
+    print("Specify --smoke or --full.")
+    return 1
 
 
 # ─────────────────────────── judge spec parser ────────────────────────────────
@@ -168,7 +185,7 @@ def _parse_judge_specs(
         if provider == "ollama":
             return make_ollama_judge(
                 model_id, prompt_template,
-                decoding={"temperature": 0.0, "max_tokens": 256, "seed": judge_seed},
+                decoding={"temperature": 0.0, "max_tokens": 768, "seed": judge_seed},
                 judge_id_suffix=suffix,
             )
         if provider == "anthropic":
@@ -393,9 +410,10 @@ def main(argv=None) -> None:
 
     sub.add_parser("doctor", help="check environment: packages, Python, encoding")
 
-    bc = sub.add_parser("build-corpus", help="build and verify the smoke corpus")
-    bc.add_argument("--smoke",  action="store_true", help="build synthetic smoke corpus")
-    bc.add_argument("--output", default="data/synthetic_smoke.jsonl")
+    bc = sub.add_parser("build-corpus", help="build and verify a corpus")
+    bc.add_argument("--smoke",  action="store_true", help="build 20-item synthetic smoke corpus")
+    bc.add_argument("--full",   action="store_true", help="build full corpus (40 tasks, target ≥170/class)")
+    bc.add_argument("--output", default=None, help="output JSONL path (default: data/synthetic_smoke.jsonl or data/full_corpus.jsonl)")
 
     run_p = sub.add_parser("run", help="run judges on corpus and compute pairwise stats")
     run_p.add_argument("--corpus",     required=True, help="path to corpus JSONL")
@@ -447,7 +465,9 @@ def main(argv=None) -> None:
         sys.exit(_run_doctor())
 
     if a.cmd == "build-corpus":
-        sys.exit(_run_build_corpus(a.smoke, a.output))
+        default_output = "data/full_corpus.jsonl" if a.full else "data/synthetic_smoke.jsonl"
+        out = a.output if a.output else default_output
+        sys.exit(_run_build_corpus(a.smoke, a.full, out))
 
     if a.cmd == "run":
         sys.exit(_run_pipeline(
