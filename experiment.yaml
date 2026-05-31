@@ -69,8 +69,30 @@ defect_classes:
   - dropped_guard
   - swapped_args
 
-# target n per defect class — set by Phase 6 power simulation (2026-05-30)
+# target n per defect class — original, set by Phase 6 power simulation (2026-05-30)
+# ci_hw_target=0.20, worst case phi=0.3 (H2/H3 axes). Applies to H2 and H3 axes.
 target_n: 170
+
+# ── Pre-registration amendment 2026-05-31 (BEFORE corpus rebuild) ────────────
+#
+# H1 (intra-model / close pairs) expected phi:
+#   Evidence: pilot_intra3 gave phi=+1.000, CI=[1.000,1.000], n=10 (INCONCLUSIVE n<30).
+#   Mechanism: two fixed-seed instances of the same model are near-duplicates, not
+#   independent judges → phi expected ≈ 1.0 by construction.
+#   Conservative floor for power analysis: phi >= 0.90.
+#
+# Power simulation results (ci_hw_target=0.15, power>=80%, n_sims=300, n_boot=300, seed=0):
+#   phi=0.70: worst-case marginals (0.2,0.2) → min_n=170
+#   phi=0.80: worst-case marginals (0.2,0.2) → min_n=130
+#   phi=0.90: worst-case marginals (0.2,0.2) → min_n=80
+#   phi=0.95: worst-case marginals (0.2,0.2) → min_n=50
+#
+# Decision (locked 2026-05-31, pre-corpus-rebuild, before viewing per-class counts):
+#   H1 axis: target_n_h1 = 80  (phi>=0.90 expected; n<80 flagged UNDERPOWERED, not padded)
+#   H2/H3 axes: target_n = 170 (original blanket, phi unknown a priori)
+#   Classes with n < target_n_h1 are reported as UNDERPOWERED in Table 2 footnote.
+#   No post-hoc adjustment of class n to match observed phi.
+target_n_h1: 80
 
 seeds:
   corpus:    0
