@@ -307,25 +307,52 @@ def _run_pipeline(
 # ─────────────────────────── calibrate ───────────────────────────────────────
 
 def _run_calibrate(corpus_path: str, judges_spec: str, out_dir: str,
-                   pos_threshold: float, n_boot: int, seed: int) -> int:
+                   pos_threshold: float, n_boot: int, seed: int,
+                   prompt_path: str = "prompts/strict_passfail.txt",
+                   api_key: str | None = None,
+                   judge_seed: int = 42) -> int:
     """Phase 5 calibration gate. Exits non-zero if either control fails.
 
-    Positive control  (same seed → identical errors): phi must be >= pos_threshold.
-    Orthogonal control (different seeds → independent): phi CI must cover 0.
+    Positive control  (same model+seed → identical errors): phi must be >= pos_threshold.
+    Orthogonal control: mock → different seeds; real judges → LLM × DeterministicChecker.
+    phi CI must cover 0. No auto-PASS — both controls are always evaluated.
     """
     from .corpus import load_corpus
     from .runner import run_judges, build_miss_matrix
-    from .mock_judges import make_calibration_judges
     import datetime
-
-    if judges_spec != "mock":
-        print("Only --judges mock is supported for calibration until Phase 2.")
-        return 1
 
     corpus = load_corpus(corpus_path)
     out = Path(out_dir)
 
-    pos_a, pos_b, orth_a, orth_b = make_calibration_judges(error_rate=0.25, seed=seed)
+    if judges_spec == "mock":
+        from .mock_judges import make_calibration_judges
+        pos_a, pos_b, orth_a, orth_b = make_calibration_judges(error_rate=0.25, seed=seed)
+    else:
+        from .judges import load_prompt, is_ollama_available
+        from .deterministic_checker import DeterministicChecker
+
+        try:
+            prompt_template = load_prompt(prompt_path)
+        except FileNotFoundError:
+            print(f"ERROR: prompt file not found: {prompt_path}")
+            return 1
+
+        if "ollama:" in judges_spec:
+            if not is_ollama_available():
+                print("ERROR: Ollama server not reachable. Start it with: ollama serve")
+                return 1
+
+        try:
+            pos_judges = _parse_judge_specs(judges_spec, prompt_template, judge_seed, api_key)
+        except ValueError as exc:
+            print(f"ERROR: {exc}")
+            return 1
+
+        pos_a, pos_b = pos_judges[0], pos_judges[1]
+        # Orthogonal pair: LLM judge × deterministic GT checker (structurally independent).
+        # Expected φ ≈ 0 (H3 axis). Gate FAILS if CI does not cover 0 — this is correct.
+        orth_a = pos_a
+        orth_b = DeterministicChecker()
 
     # --- positive control ---
     res_pos = run_judges(corpus, [pos_a, pos_b], out / "positive", force=True)
@@ -450,6 +477,12 @@ def main(argv=None) -> None:
                        help="minimum phi for positive control (default 0.8)")
     cal_p.add_argument("--n-boot",        type=int, default=500)
     cal_p.add_argument("--seed",          type=int, default=0)
+    cal_p.add_argument("--prompt",        default="prompts/strict_passfail.txt",
+                       help="path to judging prompt template (real judges only)")
+    cal_p.add_argument("--api-key",       dest="api_key", default=None,
+                       help="Anthropic API key (default: $ANTHROPIC_API_KEY env var)")
+    cal_p.add_argument("--judge-seed",    dest="judge_seed", type=int, default=42,
+                       help="seed for Ollama deterministic output (default: 42)")
 
     rep_p = sub.add_parser("report", help="emit tables.md and forest plot from results.json")
     rep_p.add_argument("results_json")
@@ -480,6 +513,7 @@ def main(argv=None) -> None:
         sys.exit(_run_calibrate(
             a.corpus, a.judges, a.out,
             a.pos_threshold, a.n_boot, a.seed,
+            a.prompt, a.api_key, a.judge_seed,
         ))
 
     if a.cmd == "report":
