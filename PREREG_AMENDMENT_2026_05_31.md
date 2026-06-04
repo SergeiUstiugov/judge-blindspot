@@ -90,3 +90,72 @@ rebuilt. The palindrome test fix (`full_corpus.py:1040`, "race car" → "race ba
 was also committed in the same pre-rebuild window. No corpus counts were used
 to select `target_n_h1`; the selection is based solely on the pilot phi value
 and the power simulation.
+
+---
+
+## Amendment 2 — H3 NOT EVALUABLE on semantic-mutation corpus (2026-06-04)
+
+**Status:** LOCKED  
+**Nature:** Design limitation — documented, not patched
+
+### Finding
+
+The H3 cross-type axis (LLM judge × deterministic checker, expected φ ≈ 0)
+is **NOT EVALUABLE** on this corpus.
+
+The corpus consists of semantic mutations: syntactically valid Python where the
+defect lies in logic, not syntax. Both candidate deterministic judges degenerate:
+
+- **Test runner (verify_gt):** zero misses by construction — it IS the ground
+  truth. Miss-vector is all-zeros → φ undefined (zero-variance column).
+- **Lightweight static checker (pylint/ruff):** empirically 0 detections across
+  all four defect classes on the smoke corpus (ruff 0/20, logged 2026-06-04).
+  Semantic mutations are outside linters' detection scope → constant miss-vector
+  → φ degenerate.
+
+Both candidate second judges yield NaN or degenerate φ. No other deterministic
+checker is available that would produce an informative miss-vector on semantic
+defects while remaining genuinely orthogonal to an LLM judge.
+
+### Decision
+
+H3 is documented as a **limitation of the original design**, not substituted
+with a post-hoc metric. The φ-based diversity analysis remains valid for H1
+and H2 (LLM × LLM, both error-prone on semantic defects).
+
+### Consequence for the calibration gate — Decision: Variant B (locked 2026-06-04)
+
+The orthogonal control in the calibration gate is **not achievable on real
+judges** for this corpus. **Decision: Variant B — explicit two-level calibration.**
+
+**Three mandatory conditions (non-negotiable):**
+
+1. `calibrate --judges real` MUST print verbatim:
+   `"ORTHOGONAL CONTROL: SKIPPED (H3 not evaluable on this corpus, see PREREG_AMENDMENT Amendment 2)"`
+   Silent omission is prohibited — the skip must be loud and attributed.
+
+2. The manifest/output `gate` key for real judges MUST read `"POSITIVE-ONLY"`, never `"PASS"`.
+   A reader of the code or paper must immediately see the gate is one-sided.
+
+3. The mock path (`calibrate --judges mock`) is NOT touched — both controls
+   (positive + orthogonal) run exactly as before. This is the software-level
+   stats-machinery correctness check.
+
+**Semantics after the change:**
+- `calibrate --judges mock` → `gate: PASS/FAIL` (both controls, software correctness)
+- `calibrate --judges <real>` → positive control runs; orthogonal SKIPPED with loud message;
+  `gate: POSITIVE-ONLY` if positive passes, `gate: FAIL` if positive fails.
+
+### Paper placement
+
+Goes into Limitations, not Results. Verbatim:
+
+> H3 (cross-type orthogonal control, LLM × deterministic checker) is NOT
+> EVALUABLE on this corpus. Pre-registration offered two candidate second
+> judges: (a) test runner — 0 miss by construction (zero variance → φ
+> undefined); (b) lightweight static checker (ruff/pylint) — empirically 0/20
+> detections across all four defect classes (semantic bugs are outside linters'
+> scope → constant miss-vector → φ degenerate). Both yield NaN/degenerate φ.
+> We document H3 as a limitation of the original design and do NOT substitute
+> a post-hoc metric. φ-based diversity analysis remains valid for H1/H2
+> (LLM × LLM, both error-prone). Empirical basis: ruff 0/20, logged 2026-06-04.

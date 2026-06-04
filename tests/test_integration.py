@@ -183,3 +183,90 @@ def test_cli_calibrate_command(tmp_path):
     rc = _run_calibrate(str(corpus_path), "mock", str(tmp_path / "cal"),
                         pos_threshold=0.8, n_boot=200, seed=0)
     assert rc == 0
+
+
+# ── real-judge calibration (Variant B / POSITIVE-ONLY) ───────────────────────
+
+def test_calibrate_real_judges_positive_pass(tmp_path, capsys):
+    """Real judges, positive control passes → gate=POSITIVE-ONLY, rc=0.
+
+    Verifies Variant B conditions:
+    - 'ORTHOGONAL CONTROL: SKIPPED' printed (loud, not silent)
+    - 'PREREG_AMENDMENT Amendment 2' cited in output
+    - manifest gate == 'POSITIVE-ONLY' (never 'PASS')
+    - orthogonal/ dir not created (orth run never happened)
+    """
+    from unittest.mock import patch
+    from judge_blindspot.corpus import save_corpus
+    from judge_blindspot.mock_judges import MockJudge
+    from judge_blindspot.cli import _run_calibrate
+
+    corpus = _make_corpus(n_def=30, n_cor=30)
+    save_corpus(corpus, tmp_path / "corpus.jsonl")
+
+    # Same seed → identical miss column → phi = +1 → positive passes
+    judge_a = MockJudge(error_rate=0.25, seed=7, judge_id="fake_a")
+    judge_b = MockJudge(error_rate=0.25, seed=7, judge_id="fake_b")
+
+    with patch("judge_blindspot.judges.load_prompt", return_value="dummy prompt"), \
+         patch("judge_blindspot.cli._parse_judge_specs", return_value=[judge_a, judge_b]):
+        rc = _run_calibrate(
+            str(tmp_path / "corpus.jsonl"),
+            "anthropic:claude-fake",   # non-mock, non-ollama → skips is_ollama_available
+            str(tmp_path / "cal"),
+            pos_threshold=0.8, n_boot=200, seed=0,
+        )
+
+    output = capsys.readouterr().out
+    assert rc == 0
+    assert "ORTHOGONAL CONTROL: SKIPPED" in output
+    assert "PREREG_AMENDMENT Amendment 2" in output
+
+    manifest = json.loads((tmp_path / "cal" / "run_manifest.json").read_text())
+    assert manifest["gate"] == "POSITIVE-ONLY", (
+        f"Expected gate='POSITIVE-ONLY', got '{manifest['gate']}'"
+    )
+
+    # Orthogonal run must not have been executed
+    assert not (tmp_path / "cal" / "orthogonal").exists(), (
+        "orthogonal/ dir was created — orth run must not happen for real judges"
+    )
+
+
+def test_calibrate_real_judges_positive_fail(tmp_path, capsys):
+    """Real judges, positive control fails → gate=FAIL, rc=1.
+
+    Verifies Variant B conditions:
+    - 'CALIBRATION FAILED (positive control)' printed
+    - rc non-zero (hard stop)
+    - manifest gate == 'FAIL'
+    - 'ORTHOGONAL CONTROL: SKIPPED' still printed (orth skipped regardless)
+    """
+    from unittest.mock import patch
+    from judge_blindspot.corpus import save_corpus
+    from judge_blindspot.mock_judges import MockJudge
+    from judge_blindspot.cli import _run_calibrate
+
+    corpus = _make_corpus(n_def=30, n_cor=30)
+    save_corpus(corpus, tmp_path / "corpus.jsonl")
+
+    # Different seeds → independent miss vectors → phi ≈ 0 << threshold 0.8
+    judge_a = MockJudge(error_rate=0.25, seed=7,  judge_id="fake_a")
+    judge_b = MockJudge(error_rate=0.25, seed=99, judge_id="fake_b")
+
+    with patch("judge_blindspot.judges.load_prompt", return_value="dummy prompt"), \
+         patch("judge_blindspot.cli._parse_judge_specs", return_value=[judge_a, judge_b]):
+        rc = _run_calibrate(
+            str(tmp_path / "corpus.jsonl"),
+            "anthropic:claude-fake",
+            str(tmp_path / "cal"),
+            pos_threshold=0.8, n_boot=200, seed=0,
+        )
+
+    output = capsys.readouterr().out
+    assert rc != 0
+    assert "CALIBRATION FAILED (positive control)" in output
+    assert "ORTHOGONAL CONTROL: SKIPPED" in output
+
+    manifest = json.loads((tmp_path / "cal" / "run_manifest.json").read_text())
+    assert manifest["gate"] == "FAIL"

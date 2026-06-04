@@ -37,7 +37,7 @@ def _run_selftest(n_boot: int = 2000, seed: int = 0) -> int:
     print(f"  phi   = {phi_a:+.3f}  CI [{phi_a_ci[0]:+.3f}, {phi_a_ci[1]:+.3f}]  shuffle≈{null_a:+.3f}")
     print(f"  ratio = {ratio_a:.3f}  CI [{ratio_a_ci[0]:.3f}, {ratio_a_ci[1]:.3f}]")
     print(f"  marginals: A={Ma[:,0].mean():.2f}  B={Ma[:,1].mean():.2f}")
-    print(f"  → verdict: {v_a.value}  ({'OK' if ok_a else 'FAIL'})")
+    print(f"  -> verdict: {v_a.value}  ({'OK' if ok_a else 'FAIL'})")
 
     # B: known-dependent
     hard = rng.random(n) < 0.40
@@ -56,15 +56,15 @@ def _run_selftest(n_boot: int = 2000, seed: int = 0) -> int:
     print(f"  phi   = {phi_b:+.3f}  CI [{phi_b_ci[0]:+.3f}, {phi_b_ci[1]:+.3f}]  shuffle≈{null_b:+.3f}")
     print(f"  ratio = {ratio_b:.3f}  CI [{ratio_b_ci[0]:.3f}, {ratio_b_ci[1]:.3f}]")
     print(f"  marginals: A={Mb[:,0].mean():.2f}  B={Mb[:,1].mean():.2f}")
-    print(f"  → verdict: {v_b.value}  ({'OK' if ok_b else 'FAIL'})")
+    print(f"  -> verdict: {v_b.value}  ({'OK' if ok_b else 'FAIL'})")
 
     ok = ok_a and ok_b
     print(f"\n{'=' * 65}")
     if ok:
         print("SELFTEST PASSED: tool distinguishes independent from dependent.")
-        print("  (A→INDEPENDENT/INCONCLUSIVE, B→OVERLAP/DUPLICATE — as required)")
+        print("  (A->INDEPENDENT/INCONCLUSIVE, B->OVERLAP/DUPLICATE -- as required)")
     else:
-        print("SELFTEST FAILED: tool does NOT distinguish cases → do NOT run on data.")
+        print("SELFTEST FAILED: tool does NOT distinguish cases -> do NOT run on data.")
     print("=" * 65)
     return 0 if ok else 1
 
@@ -311,11 +311,11 @@ def _run_calibrate(corpus_path: str, judges_spec: str, out_dir: str,
                    prompt_path: str = "prompts/strict_passfail.txt",
                    api_key: str | None = None,
                    judge_seed: int = 42) -> int:
-    """Phase 5 calibration gate. Exits non-zero if either control fails.
+    """Phase 5 calibration gate.
 
-    Positive control  (same model+seed → identical errors): phi must be >= pos_threshold.
-    Orthogonal control: mock → different seeds; real judges → LLM × DeterministicChecker.
-    phi CI must cover 0. No auto-PASS — both controls are always evaluated.
+    mock judges : both controls (positive + orthogonal) — software correctness check.
+    real judges : positive control only — orthogonal SKIPPED (H3 not evaluable,
+                  see PREREG_AMENDMENT Amendment 2). gate key = POSITIVE-ONLY.
     """
     from .corpus import load_corpus
     from .runner import run_judges, build_miss_matrix
@@ -324,12 +324,13 @@ def _run_calibrate(corpus_path: str, judges_spec: str, out_dir: str,
     corpus = load_corpus(corpus_path)
     out = Path(out_dir)
 
-    if judges_spec == "mock":
+    is_mock = (judges_spec == "mock")
+
+    if is_mock:
         from .mock_judges import make_calibration_judges
         pos_a, pos_b, orth_a, orth_b = make_calibration_judges(error_rate=0.25, seed=seed)
     else:
         from .judges import load_prompt, is_ollama_available
-        from .deterministic_checker import DeterministicChecker
 
         try:
             prompt_template = load_prompt(prompt_path)
@@ -349,10 +350,6 @@ def _run_calibrate(corpus_path: str, judges_spec: str, out_dir: str,
             return 1
 
         pos_a, pos_b = pos_judges[0], pos_judges[1]
-        # Orthogonal pair: LLM judge × deterministic GT checker (structurally independent).
-        # Expected φ ≈ 0 (H3 axis). Gate FAILS if CI does not cover 0 — this is correct.
-        orth_a = pos_a
-        orth_b = DeterministicChecker()
 
     # --- positive control ---
     res_pos = run_judges(corpus, [pos_a, pos_b], out / "positive", force=True)
@@ -362,24 +359,31 @@ def _run_calibrate(corpus_path: str, judges_spec: str, out_dir: str,
     n_pos = M_pos.shape[0]
     phi_pos = _phi(M_pos[:, 0], M_pos[:, 1]) if n_pos >= 2 else float("nan")
 
-    # --- orthogonal control ---
-    res_orth = run_judges(corpus, [orth_a, orth_b], out / "orthogonal", force=True)
-    M_orth, _, jids_orth = build_miss_matrix(corpus, res_orth, all_items=True)
-    valid2 = ~np.any(np.isnan(M_orth), axis=1)
-    M_orth = M_orth[valid2].astype(int)
-    n_orth = M_orth.shape[0]
-    if n_orth >= 2:
-        phi_orth = _phi(M_orth[:, 0], M_orth[:, 1])
-        phi_orth_ci = bootstrap_ci(
-            M_orth, lambda m: _phi(m[:, 0].astype(int), m[:, 1].astype(int)),
-            n_boot=n_boot, seed=seed,
-        )
+    # --- orthogonal control (mock only) ---
+    if is_mock:
+        res_orth = run_judges(corpus, [orth_a, orth_b], out / "orthogonal", force=True)
+        M_orth, _, jids_orth = build_miss_matrix(corpus, res_orth, all_items=True)
+        valid2 = ~np.any(np.isnan(M_orth), axis=1)
+        M_orth = M_orth[valid2].astype(int)
+        n_orth = M_orth.shape[0]
+        if n_orth >= 2:
+            phi_orth = _phi(M_orth[:, 0], M_orth[:, 1])
+            phi_orth_ci = bootstrap_ci(
+                M_orth, lambda m: _phi(m[:, 0].astype(int), m[:, 1].astype(int)),
+                n_boot=n_boot, seed=seed,
+            )
+        else:
+            phi_orth, phi_orth_ci = float("nan"), (float("nan"), float("nan"))
     else:
         phi_orth, phi_orth_ci = float("nan"), (float("nan"), float("nan"))
+        n_orth = 0
 
     # --- gate ---
-    pos_pass  = (phi_pos == phi_pos) and (phi_pos >= pos_threshold)
-    orth_pass = (phi_orth_ci[0] == phi_orth_ci[0]) and (phi_orth_ci[0] <= 0 <= phi_orth_ci[1])
+    pos_pass = (phi_pos == phi_pos) and (phi_pos >= pos_threshold)
+    if is_mock:
+        orth_pass = (phi_orth_ci[0] == phi_orth_ci[0]) and (phi_orth_ci[0] <= 0 <= phi_orth_ci[1])
+    else:
+        orth_pass = None  # not evaluated
 
     print("=" * 65)
     print("CALIBRATION GATE")
@@ -389,37 +393,58 @@ def _run_calibrate(corpus_path: str, judges_spec: str, out_dir: str,
     lo, hi = phi_orth_ci
     ci_s = f"[{lo:+.3f}, {hi:+.3f}]" if lo == lo else "—"
     print(f"\nPositive control  (same seed, n={n_pos})")
-    print(f"  phi = {phi_pos_s}  (threshold >= {pos_threshold})  → {'PASS' if pos_pass else 'FAIL'}")
+    print(f"  phi = {phi_pos_s}  (threshold >= {pos_threshold})  -> {'PASS' if pos_pass else 'FAIL'}")
     print(f"\nOrthogonal control (different seeds, n={n_orth})")
-    print(f"  phi = {phi_orth_s}  CI {ci_s}  (CI must cover 0)  → {'PASS' if orth_pass else 'FAIL'}")
+    if is_mock:
+        print(f"  phi = {phi_orth_s}  CI {ci_s}  (CI must cover 0)  -> {'PASS' if orth_pass else 'FAIL'}")
+    else:
+        print("  ORTHOGONAL CONTROL: SKIPPED (H3 not evaluable on this corpus,"
+              " see PREREG_AMENDMENT Amendment 2)")
     print(f"\n{'=' * 65}")
+
+    if is_mock:
+        gate_value = "PASS" if (pos_pass and orth_pass) else "FAIL"
+    else:
+        gate_value = "POSITIVE-ONLY" if pos_pass else "FAIL"
 
     manifest = {
         "ts": datetime.datetime.utcnow().isoformat(),
         "corpus": corpus_path,
-        "judges": "mock",
+        "judges": judges_spec,
         "positive_phi": phi_pos,
         "positive_pass": pos_pass,
         "orthogonal_phi": phi_orth,
         "orthogonal_phi_ci": list(phi_orth_ci),
         "orthogonal_pass": orth_pass,
-        "gate": "PASS" if (pos_pass and orth_pass) else "FAIL",
+        "gate": gate_value,
     }
     from .report import save_manifest
     save_manifest(manifest, out)
 
-    if pos_pass and orth_pass:
-        print("CALIBRATION PASSED — proceed to Table 3.")
-        return 0
+    if is_mock:
+        if pos_pass and orth_pass:
+            print("CALIBRATION PASSED (both controls) — proceed to Table 3.")
+            return 0
+        else:
+            if not pos_pass:
+                print("FAIL: positive control phi below threshold — pipeline or parsing broken.")
+                print("      Do NOT proceed to Table 3 until this is fixed.")
+            if not orth_pass:
+                print("FAIL: orthogonal control CI does not cover 0 — independent judges appear correlated.")
+                print("      Do NOT proceed to Table 3 until this is fixed.")
+            print("=" * 65)
+            return 1
     else:
-        if not pos_pass:
+        if pos_pass:
+            print("CALIBRATION PASSED (positive control only, gate: POSITIVE-ONLY).")
+            print("Orthogonal control not available — see PREREG_AMENDMENT Amendment 2.")
+            return 0
+        else:
+            print("CALIBRATION FAILED (positive control).")
             print("FAIL: positive control phi below threshold — pipeline or parsing broken.")
             print("      Do NOT proceed to Table 3 until this is fixed.")
-        if not orth_pass:
-            print("FAIL: orthogonal control CI does not cover 0 — independent judges appear correlated.")
-            print("      Do NOT proceed to Table 3 until this is fixed.")
-        print("=" * 65)
-        return 1
+            print("=" * 65)
+            return 1
 
 
 # ─────────────────────────── main ─────────────────────────────────────────────
