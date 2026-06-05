@@ -152,7 +152,7 @@ def _ollama_call(
     seed: int,
     model_id: str,
     host: str = OLLAMA_DEFAULT_HOST,
-    timeout: int = 120,
+    timeout: int = 300,
 ) -> Tuple[str, None]:
     """POST to ollama /api/generate. Returns (raw_text, None).
 

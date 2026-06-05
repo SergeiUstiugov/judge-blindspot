@@ -8,3 +8,5 @@ results/
 !results/power_sim/*.md
 *.csv
 !results/power_sim/*.csv
+!results/h1_wrong_operator/
+!results/h1_wrong_operator/*.json
