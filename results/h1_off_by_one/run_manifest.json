@@ -1,0 +1,16 @@
+{
+  "corpus": "data/full_corpus.jsonl",
+  "judges": [
+    "qwen2.5-coder:7b:f20a49b6c985",
+    "qwen2.5-coder:7b_clone:f20a49b6c985"
+  ],
+  "judges_spec": "ollama:qwen2.5-coder:7b",
+  "prompt_path": "prompts/strict_passfail.txt",
+  "n_items": 276,
+  "n_valid": 76,
+  "defect_class": "off_by_one",
+  "n_boot": 2000,
+  "seed": 0,
+  "judge_seed": 42,
+  "ts": "2026-06-09T11:03:18.911767"
+}

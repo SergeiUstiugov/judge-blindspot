@@ -10,3 +10,5 @@ results/
 !results/power_sim/*.csv
 !results/h1_wrong_operator/
 !results/h1_wrong_operator/*.json
+!results/h1_off_by_one/
+!results/h1_off_by_one/*.json
