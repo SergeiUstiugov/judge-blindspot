@@ -1498,6 +1498,1749 @@ _TASKS: List[_TaskDef] = [
         ],
     ),
 
+_TaskDef(
+        task_id="full_gcd",
+        spec="GCD of non-negative integers a, b via Euclidean algorithm (while b != 0: a,b = b, a%b). Raise ValueError if either is negative.",
+        correct=_d("""
+            def solution(a, b):
+                if a < 0 or b < 0: raise ValueError("arguments must be non-negative")
+                while b != 0:
+                    a, b = b, a % b
+                return a
+        """),
+        tests=_d("""
+            import pytest
+            def test_basic():      assert solution(12, 8) == 4
+            def test_coprime():    assert solution(7, 13) == 1
+            def test_same():       assert solution(9, 9) == 9
+            def test_zero_b():     assert solution(5, 0) == 5
+            def test_zero_a():     assert solution(0, 5) == 5
+            def test_both_zero():  assert solution(0, 0) == 0
+            def test_neg_a():
+                with pytest.raises(ValueError): solution(-1, 5)
+            def test_neg_b():
+                with pytest.raises(ValueError): solution(5, -1)
+        """),
+        patches=[
+            ("a % b", "a // b", "wrong_operator", "% replaced with // breaks Euclidean algorithm"),
+            ("b != 0", "b == 0", "wrong_operator", "loop condition inverted, never iterates"),
+            ("a, b = b, a % b", "a, b = a % b, b", "swapped_args", "swap order wrong, algorithm does not converge correctly"),
+            ("if a < 0 or b < 0: raise ValueError(\"arguments must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative check guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_lcm",
+        spec="LCM of non-negative integers a, b via formula (a*b)//gcd(a,b). lcm(0,x)=0. Raise ValueError if either is negative.",
+        correct=_d("""
+            def solution(a, b):
+                if a < 0 or b < 0: raise ValueError("arguments must be non-negative")
+                if a == 0 or b == 0: return 0
+                def gcd(x, y):
+                    while y != 0:
+                        x, y = y, x % y
+                    return x
+                return (a * b) // gcd(a, b)
+        """),
+        tests=_d("""
+            import pytest
+            def test_basic():     assert solution(4, 6) == 12
+            def test_coprime():   assert solution(3, 7) == 21
+            def test_same():      assert solution(5, 5) == 5
+            def test_zero_a():    assert solution(0, 7) == 0
+            def test_zero_b():    assert solution(7, 0) == 0
+            def test_one():       assert solution(1, 8) == 8
+            def test_neg_a():
+                with pytest.raises(ValueError): solution(-1, 5)
+            def test_neg_b():
+                with pytest.raises(ValueError): solution(5, -1)
+        """),
+        patches=[
+            ("(a * b) // gcd(a, b)", "(a + b) // gcd(a, b)", "wrong_operator", "+ instead of * gives wrong LCM"),
+            ("(a * b) // gcd(a, b)", "(a * b) % gcd(a, b)", "wrong_operator", "% instead of // gives wrong result"),
+            ("if a == 0 or b == 0: return 0\n    ", "",
+             "dropped_guard", "remove zero guard causes division by zero"),
+            ("if a < 0 or b < 0: raise ValueError(\"arguments must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative check guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_is_prime",
+        spec="Return True if n>=2 is prime (no divisor i with 2<=i and i*i<=n divides n). Return False for n<2. Raise ValueError if n<0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                if n < 2: return False
+                i = 2
+                while i * i <= n:
+                    if n % i == 0:
+                        return False
+                    i += 1
+                return True
+        """),
+        tests=_d("""
+            import pytest
+            def test_two():      assert solution(2) == True
+            def test_three():    assert solution(3) == True
+            def test_four():     assert solution(4) == False
+            def test_prime_17(): assert solution(17) == True
+            def test_one():      assert solution(1) == False
+            def test_zero():     assert solution(0) == False
+            def test_composite(): assert solution(9) == False
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("i * i <= n", "i * i < n", "wrong_operator", "< instead of <= misses perfect square composites like 4,9"),
+            ("n % i == 0", "n % i != 0", "wrong_operator", "!= returns False for primes instead of composites"),
+            ("if n < 2: return False\n    ", "",
+             "dropped_guard", "remove n<2 guard makes 0 and 1 return True"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_digit_sum",
+        spec="Return sum of decimal digits of non-negative integer n. Raise ValueError if n<0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                return sum(int(c) for c in str(n))
+        """),
+        tests=_d("""
+            import pytest
+            def test_basic():    assert solution(123) == 6
+            def test_zero():     assert solution(0) == 0
+            def test_hundred():  assert solution(100) == 1
+            def test_nines():    assert solution(999) == 27
+            def test_single():   assert solution(7) == 7
+            def test_large():    assert solution(12345) == 15
+            def test_neg():
+                with pytest.raises(ValueError): solution(-5)
+        """),
+        patches=[
+            ("sum(int(c) for c in str(n))", "sum(int(c) for c in str(n)) - 1", "wrong_operator", "subtracting 1 gives wrong sum"),
+            ("sum(int(c) for c in str(n))", "len(str(n))", "wrong_operator", "len counts digits not their sum"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative guard"),
+            ("sum(int(c) for c in str(n))", "sum(int(c) for c in str(n + 1))", "wrong_operator", "n+1 shifts all results by at least 1"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_count_divisors",
+        spec="Count positive divisors of n (including 1 and n). Raise ValueError if n<=0.",
+        correct=_d("""
+            def solution(n):
+                if n <= 0: raise ValueError("n must be positive")
+                count = 0
+                i = 1
+                while i * i <= n:
+                    if n % i == 0:
+                        if i * i == n:
+                            count += 1
+                        else:
+                            count += 2
+                    i += 1
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_one():      assert solution(1) == 1
+            def test_six():      assert solution(6) == 4
+            def test_twelve():   assert solution(12) == 6
+            def test_prime():    assert solution(7) == 2
+            def test_square():   assert solution(9) == 3
+            def test_sixteen():  assert solution(16) == 5
+            def test_zero():
+                with pytest.raises(ValueError): solution(0)
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("i * i <= n", "i * i < n", "wrong_operator", "< instead of <= misses perfect square root divisor"),
+            ("i * i == n", "i * i != n", "wrong_operator", "inverted check swaps single/double counting"),
+            ("count += 2", "count += 1", "wrong_operator", "counts only one divisor instead of two for non-square pairs"),
+            ("if n <= 0: raise ValueError(\"n must be positive\")\n    ", "",
+             "dropped_guard", "remove guard allows n<=0"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_collatz_steps",
+        spec="Count steps to reach 1 from n>0 via Collatz (even: n//2, odd: 3*n+1). collatz_steps(1)=0. Raise ValueError if n<=0.",
+        correct=_d("""
+            def solution(n):
+                if n <= 0: raise ValueError("n must be positive")
+                steps = 0
+                while n != 1:
+                    if n % 2 == 0:
+                        n = n // 2
+                    else:
+                        n = 3 * n + 1
+                    steps += 1
+                return steps
+        """),
+        tests=_d("""
+            import pytest
+            def test_one():   assert solution(1) == 0
+            def test_two():   assert solution(2) == 1
+            def test_four():  assert solution(4) == 2
+            def test_six():   assert solution(6) == 8
+            def test_three(): assert solution(3) == 7
+            def test_zero():
+                with pytest.raises(ValueError): solution(0)
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("n % 2 == 0", "n % 2 != 0", "wrong_operator", "inverts even/odd check, applies wrong rule"),
+            ("n // 2", "n // 3", "wrong_operator", "wrong divisor in even step"),
+            ("3 * n + 1", "3 * n - 1", "wrong_operator", "wrong constant in odd step"),
+            ("if n <= 0: raise ValueError(\"n must be positive\")\n    ", "",
+             "dropped_guard", "remove guard allows n<=0"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_count_set_bits",
+        spec="Count 1-bits (popcount) of non-negative integer n. Raise ValueError if n<0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                count = 0
+                while n > 0:
+                    count += n & 1
+                    n >>= 1
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_zero():      assert solution(0) == 0
+            def test_one():       assert solution(1) == 1
+            def test_seven():     assert solution(7) == 3
+            def test_eight():     assert solution(8) == 1
+            def test_255():       assert solution(255) == 8
+            def test_two():       assert solution(2) == 1
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("count += n & 1", "count += n | 1", "wrong_operator", "| instead of & always adds 1 per iteration"),
+            ("n >>= 1", "n <<= 1", "wrong_operator", "left shift instead of right shift causes infinite loop"),
+            ("while n > 0", "while n >= 0", "wrong_operator", ">= causes infinite loop on n==0"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_is_power_of_two",
+        spec="Return True if n is a positive power of two (1,2,4,8,...). Return False for n=0. Raise ValueError if n<0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                return n > 0 and (n & (n - 1)) == 0
+        """),
+        tests=_d("""
+            import pytest
+            def test_one():    assert solution(1) == True
+            def test_two():    assert solution(2) == True
+            def test_four():   assert solution(4) == True
+            def test_eight():  assert solution(8) == True
+            def test_three():  assert solution(3) == False
+            def test_six():    assert solution(6) == False
+            def test_zero():   assert solution(0) == False
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("(n & (n - 1)) == 0", "(n & (n - 1)) != 0", "wrong_operator", "!= inverts the power-of-two bit trick"),
+            ("n > 0 and", "n >= 0 and", "wrong_operator", ">= includes 0 making it return True for n=0"),
+            ("n & (n - 1)", "n | (n - 1)", "wrong_operator", "| instead of & breaks the bit trick"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_bit_length",
+        spec="Return minimum bits to represent n: bit_length(0)=1, bit_length(1)=1, bit_length(2)=2. Raise ValueError if n<0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                if n == 0: return 1
+                count = 0
+                while n > 0:
+                    count += 1
+                    n >>= 1
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_zero():   assert solution(0) == 1
+            def test_one():    assert solution(1) == 1
+            def test_two():    assert solution(2) == 2
+            def test_seven():  assert solution(7) == 3
+            def test_eight():  assert solution(8) == 4
+            def test_large():  assert solution(255) == 8
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("n >>= 1", "n <<= 1", "wrong_operator", "left shift causes infinite loop"),
+            ("while n > 0", "while n >= 0", "wrong_operator", ">= causes infinite loop"),
+            ("if n == 0: return 1\n    ", "",
+             "dropped_guard", "remove zero special case, returns 0 instead of 1 for n=0"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_xor_range",
+        spec="Return XOR of all integers from 1 to n inclusive. xor_range(0)=0 (empty). Raise ValueError if n<0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                result = 0
+                for i in range(1, n + 1):
+                    result ^= i
+                return result
+        """),
+        tests=_d("""
+            import pytest
+            def test_zero():  assert solution(0) == 0
+            def test_one():   assert solution(1) == 1
+            def test_two():   assert solution(2) == 3
+            def test_three(): assert solution(3) == 0
+            def test_four():  assert solution(4) == 4
+            def test_six():   assert solution(6) == 7
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("result ^= i", "result |= i", "wrong_operator", "| instead of ^ gives wrong cumulative result"),
+            ("range(1, n + 1)", "range(0, n + 1)", "off_by_one", "includes 0 in range, XOR with 0 is identity so no change for n>=1 but semantically wrong"),
+            ("result ^= i", "result &= i", "wrong_operator", "& instead of ^ gives wrong result"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_parity",
+        spec="Return 1 if n has odd number of set bits, 0 if even. Raise ValueError if n < 0.",
+        correct=_d("""
+            def solution(n):
+                if n < 0: raise ValueError("n must be non-negative")
+                count = 0
+                while n:
+                    count += n & 1
+                    n >>= 1
+                return count % 2
+        """),
+        tests=_d("""
+            import pytest
+            def test_zero():    assert solution(0) == 0
+            def test_one():     assert solution(1) == 1
+            def test_two():     assert solution(2) == 1
+            def test_three():   assert solution(3) == 0
+            def test_seven():   assert solution(7) == 1
+            def test_eight():   assert solution(8) == 1
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("count += n & 1", "count += n & 0", "wrong_operator", "& 0 always adds 0, count stays 0"),
+            ("count % 2", "count % 3", "wrong_operator", "% 3 gives wrong parity for count==2"),
+            ("n < 0", "n <= 0", "wrong_operator", "guard fires on n==0 which is valid"),
+            ("if n < 0: raise ValueError(\"n must be non-negative\")\n    ", "",
+             "dropped_guard", "remove negative input guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_matrix_transpose",
+        spec="Transpose an N×M matrix (list of lists). Raise ValueError if matrix is empty or rows have different lengths.",
+        correct=_d("""
+            def solution(matrix):
+                if not matrix: raise ValueError("matrix must not be empty")
+                row_len = len(matrix[0])
+                for row in matrix:
+                    if len(row) != row_len: raise ValueError("all rows must have the same length")
+                return [[matrix[r][c] for r in range(len(matrix))] for c in range(row_len)]
+        """),
+        tests=_d("""
+            import pytest
+            def test_2x3():
+                m = [[1,2,3],[4,5,6]]
+                assert solution(m) == [[1,4],[2,5],[3,6]]
+            def test_1x1():
+                assert solution([[7]]) == [[7]]
+            def test_single_row():
+                assert solution([[1,2,3]]) == [[1],[2],[3]]
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+            def test_ragged():
+                with pytest.raises(ValueError): solution([[1,2],[3]])
+        """),
+        patches=[
+            ("for r in range(len(matrix))", "for r in range(len(matrix) - 1)", "off_by_one", "misses last row in transpose"),
+            ("for c in range(row_len)", "for c in range(row_len - 1)", "off_by_one", "misses last column in transpose"),
+            ("matrix[r][c]", "matrix[c][r]", "swapped_args", "swaps row and column indices"),
+            ("if not matrix: raise ValueError(\"matrix must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty matrix guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_matrix_diagonal_sum",
+        spec="Sum of main diagonal elements of an N×N square matrix. Raise ValueError if matrix is empty or not square.",
+        correct=_d("""
+            def solution(matrix):
+                if not matrix: raise ValueError("matrix must not be empty")
+                n = len(matrix)
+                for row in matrix:
+                    if len(row) != n: raise ValueError("matrix must be square")
+                return sum(matrix[i][i] for i in range(n))
+        """),
+        tests=_d("""
+            import pytest
+            def test_2x2():
+                assert solution([[1,2],[3,4]]) == 5
+            def test_3x3():
+                assert solution([[1,0,0],[0,2,0],[0,0,3]]) == 6
+            def test_1x1():
+                assert solution([[9]]) == 9
+            def test_non_square():
+                with pytest.raises(ValueError): solution([[1,2,3],[4,5,6]])
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("matrix[i][i]", "matrix[i][n-1-i]", "swapped_args", "sums anti-diagonal instead of main diagonal"),
+            ("range(n)", "range(n - 1)", "off_by_one", "skips last diagonal element"),
+            ("len(row) != n", "len(row) == n", "wrong_operator", "guard inverted, rejects square matrices"),
+            ("if not matrix: raise ValueError(\"matrix must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty matrix guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_matrix_antidiagonal_sum",
+        spec="Sum of anti-diagonal elements (top-right to bottom-left) of N×N matrix. Raise ValueError if not square or empty.",
+        correct=_d("""
+            def solution(matrix):
+                if not matrix: raise ValueError("matrix must not be empty")
+                n = len(matrix)
+                for row in matrix:
+                    if len(row) != n: raise ValueError("matrix must be square")
+                return sum(matrix[i][n - 1 - i] for i in range(n))
+        """),
+        tests=_d("""
+            import pytest
+            def test_2x2():
+                assert solution([[1,2],[3,4]]) == 5
+            def test_3x3():
+                assert solution([[1,2,3],[4,5,6],[7,8,9]]) == 15
+            def test_1x1():
+                assert solution([[5]]) == 5
+            def test_non_square():
+                with pytest.raises(ValueError): solution([[1,2],[3,4],[5,6]])
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("matrix[i][n - 1 - i]", "matrix[i][i]", "swapped_args", "sums main diagonal instead of anti-diagonal"),
+            ("n - 1 - i", "n - i", "off_by_one", "index out of bounds or wrong column"),
+            ("len(row) != n", "len(row) != n + 1", "wrong_operator", "wrong square check threshold"),
+            ("if not matrix: raise ValueError(\"matrix must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty matrix guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_matrix_row_max_sum",
+        spec="Return index of row with maximum sum. Raise ValueError if matrix is empty.",
+        correct=_d("""
+            def solution(matrix):
+                if not matrix: raise ValueError("matrix must not be empty")
+                return max(range(len(matrix)), key=lambda r: sum(matrix[r]))
+        """),
+        tests=_d("""
+            import pytest
+            def test_clear_winner():
+                assert solution([[1,2],[10,20],[3,4]]) == 1
+            def test_single_row():
+                assert solution([[5,6,7]]) == 0
+            def test_negative_rows():
+                assert solution([[-1,-2],[-3,-4]]) == 0
+            def test_first_wins():
+                assert solution([[9,9],[1,2],[3,4]]) == 0
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("max(range(len(matrix))", "min(range(len(matrix))", "wrong_operator", "returns row with minimum sum"),
+            ("sum(matrix[r])", "sum(matrix[r]) * -1", "wrong_operator", "negates sums, inverting order"),
+            ("if not matrix: raise ValueError(\"matrix must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty matrix guard"),
+            ("key=lambda r: sum(matrix[r])", "key=lambda r: len(matrix[r])", "swapped_args", "compares row length instead of row sum"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_matrix_scalar_multiply",
+        spec="Return new matrix with all elements multiplied by scalar k. Raise ValueError if matrix is empty.",
+        correct=_d("""
+            def solution(matrix, k):
+                if not matrix: raise ValueError("matrix must not be empty")
+                return [[k * matrix[r][c] for c in range(len(matrix[r]))] for r in range(len(matrix))]
+        """),
+        tests=_d("""
+            import pytest
+            def test_multiply_by_2():
+                assert solution([[1,2],[3,4]], 2) == [[2,4],[6,8]]
+            def test_multiply_by_0():
+                assert solution([[1,2],[3,4]], 0) == [[0,0],[0,0]]
+            def test_multiply_by_neg1():
+                assert solution([[1,-2],[3,-4]], -1) == [[-1,2],[-3,4]]
+            def test_single_element():
+                assert solution([[5]], 3) == [[15]]
+            def test_empty():
+                with pytest.raises(ValueError): solution([], 2)
+        """),
+        patches=[
+            ("k * matrix[r][c]", "k + matrix[r][c]", "wrong_operator", "adds instead of multiplies"),
+            ("for c in range(len(matrix[r]))", "for c in range(len(matrix[r]) - 1)", "off_by_one", "skips last column"),
+            ("for r in range(len(matrix))", "for r in range(len(matrix) - 1)", "off_by_one", "skips last row"),
+            ("if not matrix: raise ValueError(\"matrix must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty matrix guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_matrix_all_positive",
+        spec="Return True if ALL elements > 0. Raise ValueError if matrix is empty.",
+        correct=_d("""
+            def solution(matrix):
+                if not matrix: raise ValueError("matrix must not be empty")
+                return all(matrix[r][c] > 0 for r in range(len(matrix)) for c in range(len(matrix[r])))
+        """),
+        tests=_d("""
+            import pytest
+            def test_all_positive():
+                assert solution([[1,2],[3,4]]) == True
+            def test_one_zero():
+                assert solution([[1,2],[0,4]]) == False
+            def test_one_negative():
+                assert solution([[1,-2],[3,4]]) == False
+            def test_single_pos():
+                assert solution([[7]]) == True
+            def test_single_zero():
+                assert solution([[0]]) == False
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("matrix[r][c] > 0", "matrix[r][c] >= 0", "wrong_operator", ">= 0 allows zero elements"),
+            ("all(", "any(", "wrong_operator", "any() returns True if at least one positive"),
+            ("matrix[r][c] > 0", "matrix[r][c] < 0", "wrong_operator", "checks for negative instead of positive"),
+            ("if not matrix: raise ValueError(\"matrix must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty matrix guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_is_balanced_brackets",
+        spec="Return True if s has balanced brackets using only ()[]{}. Raise ValueError if s is empty.",
+        correct=_d("""
+            def solution(s):
+                if not s: raise ValueError("s must not be empty")
+                matching = {')': '(', ']': '[', '}': '{'}
+                stack = []
+                for ch in s:
+                    if ch in '([{':
+                        stack.append(ch)
+                    elif ch in ')]}':
+                        if not stack or stack[-1] != matching[ch]:
+                            return False
+                        stack.pop()
+                return len(stack) == 0
+        """),
+        tests=_d("""
+            import pytest
+            def test_nested():       assert solution("(())") == True
+            def test_mixed():        assert solution("()[]{}") == True
+            def test_wrong_close():  assert solution("(]") == False
+            def test_interleaved():  assert solution("{[}]") == False
+            def test_unclosed():     assert solution("((") == False
+            def test_empty():
+                with pytest.raises(ValueError): solution("")
+        """),
+        patches=[
+            ("stack[-1] != matching[ch]", "stack[-1] == matching[ch]", "wrong_operator", "inverted mismatch check"),
+            ("len(stack) == 0", "len(stack) != 0", "wrong_operator", "returns True when stack non-empty"),
+            ("if not stack or stack[-1] != matching[ch]:", "if stack and stack[-1] != matching[ch]:", "wrong_operator", "removes empty-stack check"),
+            ("if not s: raise ValueError(\"s must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty string guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_evaluate_postfix",
+        spec="Evaluate postfix expression. Input: list of tokens (strings), operators: + - * //. Raise ValueError if stack has != 1 element at end, or division by zero.",
+        correct=_d("""
+            def solution(tokens):
+                stack = []
+                for token in tokens:
+                    if token in ('+', '-', '*', '//'):
+                        if len(stack) < 2: raise ValueError("not enough operands")
+                        b = stack.pop()
+                        a = stack.pop()
+                        if token == '+':
+                            stack.append(a + b)
+                        elif token == '-':
+                            stack.append(a - b)
+                        elif token == '*':
+                            stack.append(a * b)
+                        elif token == '//':
+                            if b == 0: raise ValueError("division by zero")
+                            stack.append(a // b)
+                    else:
+                        stack.append(int(token))
+                if len(stack) != 1: raise ValueError("invalid expression")
+                return stack[0]
+        """),
+        tests=_d("""
+            import pytest
+            def test_add():
+                assert solution(["3","4","+"]) == 7
+            def test_complex():
+                assert solution(["5","1","2","+","4","*","+","3","-"]) == 14
+            def test_floordiv():
+                assert solution(["6","2","//"]) == 3
+            def test_div_zero():
+                with pytest.raises(ValueError): solution(["5","0","//"])
+            def test_invalid_expr():
+                with pytest.raises(ValueError): solution(["1","2"])
+        """),
+        patches=[
+            ("a + b", "b + a", "wrong_operator", "addition is commutative so swap a and b with subtraction"),
+            ("a - b", "b - a", "wrong_operator", "subtraction order reversed gives wrong result"),
+            ("a // b", "b // a", "swapped_args", "division operands swapped"),
+            ("b == 0", "b != 0", "wrong_operator", "division by zero guard inverted"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_next_greater_element",
+        spec="For each element in lst, return the next greater element to its right, or -1 if none. Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("lst must not be empty")
+                n = len(lst)
+                result = [-1] * n
+                stack = []
+                for i in range(n):
+                    while stack and lst[stack[-1]] < lst[i]:
+                        result[stack.pop()] = lst[i]
+                    stack.append(i)
+                return result
+        """),
+        tests=_d("""
+            import pytest
+            def test_typical():
+                assert solution([4,5,2,25]) == [5,25,25,-1]
+            def test_decreasing():
+                assert solution([13,7,6,12]) == [-1,12,12,-1]
+            def test_single():
+                assert solution([1]) == [-1]
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+            def test_all_same():
+                assert solution([3,3,3]) == [-1,-1,-1]
+        """),
+        patches=[
+            ("lst[stack[-1]] < lst[i]", "lst[stack[-1]] > lst[i]", "wrong_operator", "finds next smaller instead of next greater"),
+            ("lst[stack[-1]] < lst[i]", "lst[stack[-1]] <= lst[i]", "wrong_operator", "includes equal elements as next greater"),
+            ("result = [-1] * n", "result = [0] * n", "wrong_operator", "default value 0 instead of -1"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n    ", "",
+             "dropped_guard", "remove empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_stack_minimum",
+        spec="Return the minimum element of lst. Raise ValueError if empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("list must not be empty")
+                result = lst[0]
+                for x in lst[1:]:
+                    if x < result:
+                        result = x
+                return result
+        """),
+        tests=_d("""
+            import pytest
+            def test_mixed():    assert solution([3,1,4,1,5]) == 1
+            def test_single():   assert solution([5]) == 5
+            def test_negative():  assert solution([-3,-1,-2]) == -3
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+            def test_all_same(): assert solution([2,2,2]) == 2
+        """),
+        patches=[
+            ("if x < result:", "if x > result:",
+             "wrong_operator", "returns max instead of min"),
+            ("result = lst[0]", "result = lst[-1]",
+             "off_by_one", "seed with last element instead of first"),
+            ("for x in lst[1:]:", "for x in lst:",
+             "off_by_one", "re-processes lst[0] including seed element"),
+            ("if not lst: raise ValueError(\"list must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty-list guard"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_decode_rle",
+        spec="Decode a run-length encoded list of (count, value) pairs into a flat list. Raise ValueError if list is empty or any count <= 0.",
+        correct=_d("""
+            def solution(pairs):
+                if not pairs: raise ValueError("pairs must not be empty")
+                result = []
+                for count, val in pairs:
+                    if count <= 0: raise ValueError("count must be positive")
+                    result.extend([val] * count)
+                return result
+        """),
+        tests=_d("""
+            import pytest
+            def test_basic():     assert solution([(3,'a'),(2,'b')]) == ['a','a','a','b','b']
+            def test_single():    assert solution([(1,5)]) == [5]
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+            def test_zero_count():
+                with pytest.raises(ValueError): solution([(0,'x')])
+            def test_negative_count():
+                with pytest.raises(ValueError): solution([(-1,'x')])
+            def test_multi_count(): assert solution([(4,7)]) == [7,7,7,7]
+        """),
+        patches=[
+            ("if count <= 0:", "if count == 0:",
+             "wrong_operator", "allows negative counts through"),
+            ("result.extend([val] * count)", "result.append(val)",
+             "wrong_operator", "ignores count, appends only once"),
+            ("result.extend([val] * count)", "result.extend([val] * (count - 1))",
+             "off_by_one", "extends one fewer element than required"),
+            ("if not pairs: raise ValueError(\"pairs must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty-pairs guard"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_tree_height",
+        spec="Return height of binary tree stored as list (None=absent). Index i has children 2i+1 and 2i+2. Height = max depth from root. Empty tree or None root has height 0. Single node has height 1. Raise ValueError if tree is None.",
+        correct=_d("""
+            def solution(tree):
+                if tree is None: raise ValueError("tree must not be None")
+                if not tree or tree[0] is None: return 0
+                n = len(tree)
+                def h(i):
+                    if i >= n or tree[i] is None: return 0
+                    return 1 + max(h(2*i+1), h(2*i+2))
+                return h(0)
+        """),
+        tests=_d("""
+            import pytest
+            def test_full():     assert solution([1,2,3,4,5]) == 3
+            def test_single():   assert solution([1]) == 1
+            def test_right():    assert solution([1,None,3]) == 2
+            def test_empty():    assert solution([]) == 0
+            def test_none_root(): assert solution([None]) == 0
+            def test_none_tree():
+                with pytest.raises(ValueError): solution(None)
+        """),
+        patches=[
+            ("1 + max(h(2*i+1), h(2*i+2))", "1 + min(h(2*i+1), h(2*i+2))",
+             "wrong_operator", "returns minimum-height path instead of maximum"),
+            ("h(2*i+1)", "h(2*i)",
+             "off_by_one", "left child index is wrong, skips a level"),
+            ("h(2*i+2)", "h(2*i+1)",
+             "off_by_one", "both children point to left child"),
+            ("if tree is None: raise ValueError(\"tree must not be None\")\n                ", "",
+             "dropped_guard", "remove None-tree guard"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_count_leaves",
+        spec="Count leaf nodes in binary tree (array representation, index i has children 2i+1 and 2i+2). Raise ValueError if tree is None. Empty tree has 0 leaves.",
+        correct=_d("""
+            def solution(tree):
+                if tree is None: raise ValueError("tree must not be None")
+                if not tree or tree[0] is None: return 0
+                n = len(tree)
+                count = 0
+                def visit(i):
+                    nonlocal count
+                    if i >= n or tree[i] is None: return
+                    left = 2*i+1
+                    right = 2*i+2
+                    if (left >= n or tree[left] is None) and (right >= n or tree[right] is None):
+                        count += 1
+                    else:
+                        visit(left)
+                        visit(right)
+                visit(0)
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_two_leaves():   assert solution([1,2,3]) == 2
+            def test_single():       assert solution([1]) == 1
+            def test_three_leaves(): assert solution([1,2,3,4,5]) == 3
+            def test_empty():        assert solution([]) == 0
+            def test_none_tree():
+                with pytest.raises(ValueError): solution(None)
+        """),
+        patches=[
+            ("count += 1", "count += 2",
+             "wrong_operator", "double-counts each leaf"),
+            ("left = 2*i+1", "left = 2*i",
+             "off_by_one", "left child index is off by one"),
+            ("if tree is None: raise ValueError(\"tree must not be None\")\n                ", "",
+             "dropped_guard", "remove None-tree guard"),
+            ("(left >= n or tree[left] is None) and (right >= n or tree[right] is None)",
+             "(left >= n or tree[left] is None) or (right >= n or tree[right] is None)",
+             "wrong_operator", "counts nodes with any absent child as leaf"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_bfs_level_count",
+        spec="Count nodes at level k (0-indexed, root=level 0) in a binary tree (array representation). Raise ValueError if tree is None or k<0.",
+        correct=_d("""
+            def solution(tree, k):
+                if tree is None: raise ValueError("tree must not be None")
+                if k < 0: raise ValueError("k must be non-negative")
+                if not tree or tree[0] is None: return 0
+                n = len(tree)
+                from collections import deque
+                queue = deque([(0, 0)])
+                count = 0
+                while queue:
+                    idx, level = queue.popleft()
+                    if idx >= n or tree[idx] is None: continue
+                    if level == k:
+                        count += 1
+                    elif level < k:
+                        queue.append((2*idx+1, level+1))
+                        queue.append((2*idx+2, level+1))
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_level0():  assert solution([1,2,3,4,5,6,7], 0) == 1
+            def test_level1():  assert solution([1,2,3,4,5,6,7], 1) == 2
+            def test_level2():  assert solution([1,2,3,4,5,6,7], 2) == 4
+            def test_level3():  assert solution([1,2,3,4,5,6,7], 3) == 0
+            def test_empty():   assert solution([], 0) == 0
+            def test_neg_k():
+                with pytest.raises(ValueError): solution([1], -1)
+            def test_none_tree():
+                with pytest.raises(ValueError): solution(None, 0)
+        """),
+        patches=[
+            ("if level == k:", "if level != k:",
+             "wrong_operator", "counts nodes not at level k"),
+            ("elif level < k:", "elif level <= k:",
+             "wrong_operator", "also pushes children for nodes at level k"),
+            ("if k < 0: raise ValueError(\"k must be non-negative\")\n                ", "",
+             "dropped_guard", "remove negative-k guard"),
+            ("queue.append((2*idx+1, level+1))", "queue.append((2*idx, level+1))",
+             "off_by_one", "left child index is off by one"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_dfs_reachable_count",
+        spec="Count nodes reachable from source in undirected graph (adjacency list as dict). Raise ValueError if source not in graph.",
+        correct=_d("""
+            def solution(graph, source):
+                if source not in graph: raise ValueError("source not in graph")
+                visited = set()
+                stack = [source]
+                while stack:
+                    node = stack.pop()
+                    if node not in visited:
+                        visited.add(node)
+                        for nb in graph[node]:
+                            if nb not in visited:
+                                stack.append(nb)
+                return len(visited)
+        """),
+        tests=_d("""
+            import pytest
+            def test_connected():
+                g = {0:[1,2],1:[0],2:[0,3],3:[2]}
+                assert solution(g, 0) == 4
+            def test_isolated():
+                g = {0:[],1:[2],2:[1]}
+                assert solution(g, 0) == 1
+            def test_source_missing():
+                with pytest.raises(ValueError): solution({0:[1],1:[0]}, 99)
+            def test_single_node():
+                assert solution({5:[]}, 5) == 1
+        """),
+        patches=[
+            ("if node not in visited:", "if node in visited:",
+             "wrong_operator", "skips unvisited nodes, never explores"),
+            ("if nb not in visited:", "if nb in visited:",
+             "wrong_operator", "only appends already-visited neighbours"),
+            ("return len(visited)", "return len(visited) - 1",
+             "off_by_one", "excludes source from count"),
+            ("if source not in graph: raise ValueError(\"source not in graph\")\n                ", "",
+             "dropped_guard", "remove missing-source guard"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_has_cycle_undirected",
+        spec="Return True if undirected graph (adjacency list as dict, nodes are ints) contains a cycle. Return False if empty graph.",
+        correct=_d("""
+            def solution(graph):
+                if not graph: return False
+                visited = set()
+                def dfs(node, parent):
+                    visited.add(node)
+                    for nb in graph.get(node, []):
+                        if nb not in visited:
+                            if dfs(nb, node): return True
+                        elif nb != parent:
+                            return True
+                    return False
+                for node in graph:
+                    if node not in visited:
+                        if dfs(node, -1): return True
+                return False
+        """),
+        tests=_d("""
+            def test_triangle():
+                g = {0:[1,2],1:[0,2],2:[0,1]}
+                assert solution(g) == True
+            def test_tree():
+                g = {0:[1,2],1:[0],2:[0]}
+                assert solution(g) == False
+            def test_single():
+                assert solution({0:[]}) == False
+            def test_empty():
+                assert solution({}) == False
+            def test_chain_no_cycle():
+                g = {0:[1],1:[0,2],2:[1]}
+                assert solution(g) == False
+        """),
+        patches=[
+            ("if nb not in visited:", "if nb in visited:",
+             "wrong_operator", "inverts visit check, logic broken"),
+            ("elif nb != parent:", "elif nb == parent:",
+             "wrong_operator", "wrong cycle detection condition"),
+            ("if node not in visited:", "if node in visited:",
+             "wrong_operator", "skips unvisited components"),
+            ("            if nb not in visited:\n                if dfs(nb, node): return True\n            elif nb != parent:\n                return True\n",
+             "            if nb not in visited:\n                if dfs(nb, node): return True\n",
+             "dropped_guard", "remove parent-check cycle detection"),
+        ],
+    ),
+    _TaskDef(
+        task_id="full_insertion_sort",
+        spec="Sort list in ascending order using insertion sort, return new list. Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("list must not be empty")
+                arr = list(lst)
+                for i in range(1, len(arr)):
+                    key = arr[i]
+                    j = i - 1
+                    while j >= 0 and arr[j] > key:
+                        arr[j + 1] = arr[j]
+                        j -= 1
+                    arr[j + 1] = key
+                return arr
+        """),
+        tests=_d("""
+            import pytest
+            def test_mixed():    assert solution([3,1,4,1,5]) == [1,1,3,4,5]
+            def test_single():   assert solution([1]) == [1]
+            def test_reverse():  assert solution([5,4,3,2,1]) == [1,2,3,4,5]
+            def test_sorted():   assert solution([1,2,3]) == [1,2,3]
+            def test_empty():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("arr[j] > key", "arr[j] < key",
+             "wrong_operator", "sorts in descending order"),
+            ("while j >= 0 and arr[j] > key:", "while j > 0 and arr[j] > key:",
+             "wrong_operator", "skips comparison at index 0"),
+            ("arr[j + 1] = arr[j]", "arr[j] = arr[j + 1]",
+             "swapped_args", "shifts in wrong direction, corrupts array"),
+            ("for i in range(1, len(arr)):", "for i in range(len(arr)):",
+             "off_by_one", "starts outer loop at 0, compares element with itself"),
+            ("if not lst: raise ValueError(\"list must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty-list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_count_inversions",
+        spec="Count inversions in lst: pairs (i,j) with i<j and lst[i]>lst[j]. Raise ValueError if fewer than 2 elements.",
+        correct=_d("""
+            def solution(lst):
+                if len(lst) < 2: raise ValueError("need at least 2 elements")
+                count = 0
+                for i in range(len(lst) - 1):
+                    for j in range(i + 1, len(lst)):
+                        if lst[i] > lst[j]:
+                            count += 1
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_two_inversions(): assert solution([3,1,2]) == 2
+            def test_no_inversions(): assert solution([1,2,3]) == 0
+            def test_all_inversions(): assert solution([3,2,1]) == 3
+            def test_mixed(): assert solution([1,3,2,3,1]) == 4
+            def test_too_short_raises():
+                with pytest.raises(ValueError): solution([1])
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("lst[i] > lst[j]", "lst[i] >= lst[j]",
+             "wrong_operator", "counts equal pairs as inversions too"),
+            ("lst[i] > lst[j]", "lst[i] < lst[j]",
+             "wrong_operator", "counts non-inversions instead of inversions"),
+            ("range(len(lst) - 1)", "range(len(lst))",
+             "off_by_one", "i can equal len(lst)-1, j range becomes empty but wastes iteration; more critically i==j-1 edge accessed"),
+            ("range(i + 1, len(lst))", "range(i, len(lst))",
+             "off_by_one", "includes i==j pairs, comparing element to itself"),
+            ("if len(lst) < 2: raise ValueError(\"need at least 2 elements\")\n            ", "",
+             "dropped_guard", "removes the too-short guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_dutch_flag_partition",
+        spec="Partition lst into three lists: elements < pivot, == pivot, > pivot. Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst, pivot):
+                if not lst: raise ValueError("lst must not be empty")
+                less = [x for x in lst if x < pivot]
+                equal = [x for x in lst if x == pivot]
+                greater = [x for x in lst if x > pivot]
+                return (less, equal, greater)
+        """),
+        tests=_d("""
+            import pytest
+            def test_mixed():
+                l, e, g = solution([1,4,2,3,4,5], 3)
+                assert l == [1,2] and e == [3] and g == [4,4,5]
+            def test_all_equal():
+                l, e, g = solution([2,2,2], 2)
+                assert l == [] and e == [2,2,2] and g == []
+            def test_all_less():
+                l, e, g = solution([1,2,3], 5)
+                assert l == [1,2,3] and e == [] and g == []
+            def test_all_greater():
+                l, e, g = solution([4,5,6], 3)
+                assert l == [] and e == [] and g == [4,5,6]
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([], 1)
+        """),
+        patches=[
+            ("x < pivot", "x <= pivot",
+             "wrong_operator", "equal elements go to less instead of equal"),
+            ("x > pivot", "x >= pivot",
+             "wrong_operator", "equal elements go to greater instead of equal"),
+            ("x == pivot", "x != pivot",
+             "wrong_operator", "equal partition gets non-equal elements"),
+            ("[x for x in lst if x < pivot]", "[x for x in lst if x > pivot]",
+             "wrong_operator", "less and greater conditions swapped"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_kth_smallest",
+        spec="Return k-th smallest element (1-indexed) in lst. Raise ValueError if lst is empty or k out of range.",
+        correct=_d("""
+            def solution(lst, k):
+                if not lst: raise ValueError("lst must not be empty")
+                if k < 1 or k > len(lst): raise ValueError("k out of range")
+                return sorted(lst)[k - 1]
+        """),
+        tests=_d("""
+            import pytest
+            def test_first(): assert solution([3,1,4,1,5], 1) == 1
+            def test_middle(): assert solution([3,1,4,1,5], 3) == 3
+            def test_last(): assert solution([3,1,4,1,5], 5) == 5
+            def test_k_zero_raises():
+                with pytest.raises(ValueError): solution([1,2,3], 0)
+            def test_k_too_large_raises():
+                with pytest.raises(ValueError): solution([1,2,3], 4)
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([], 1)
+            def test_single(): assert solution([7], 1) == 7
+        """),
+        patches=[
+            ("sorted(lst)[k - 1]", "sorted(lst)[k]",
+             "off_by_one", "returns k+1-th element instead of k-th (0-indexed offset)"),
+            ("sorted(lst)[k - 1]", "sorted(lst, reverse=True)[k - 1]",
+             "wrong_operator", "returns k-th largest instead of k-th smallest"),
+            ("k < 1", "k < 0",
+             "wrong_operator", "allows k=0 which would be invalid 0-indexed access"),
+            ("k > len(lst)", "k >= len(lst)",
+             "wrong_operator", "rejects k=len(lst) which is a valid last element"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_is_sorted_asc",
+        spec="Return True if lst is non-strictly ascending (each element >= previous). Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("lst must not be empty")
+                for i in range(1, len(lst)):
+                    if lst[i] < lst[i - 1]:
+                        return False
+                return True
+        """),
+        tests=_d("""
+            import pytest
+            def test_strictly_asc(): assert solution([1,2,3]) == True
+            def test_non_strict_asc(): assert solution([1,1,2]) == True
+            def test_desc(): assert solution([3,2,1]) == False
+            def test_single(): assert solution([1]) == True
+            def test_dip(): assert solution([2,1,3]) == False
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("lst[i] < lst[i - 1]", "lst[i] <= lst[i - 1]",
+             "wrong_operator", "rejects equal adjacent elements, so [1,1,2] returns False incorrectly"),
+            ("lst[i] < lst[i - 1]", "lst[i] > lst[i - 1]",
+             "wrong_operator", "checks descending condition instead of ascending violation"),
+            ("range(1, len(lst))", "range(len(lst))",
+             "off_by_one", "starts at i=0, accesses lst[-1] which wraps around"),
+            ("lst[i] < lst[i - 1]", "lst[i - 1] < lst[i]",
+             "swapped_args", "returns False when ascending (correct) instead of when descending"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_mode",
+        spec="Return the most frequent element in lst (any one if tie). Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("lst must not be empty")
+                counts = {}
+                for x in lst:
+                    counts[x] = counts.get(x, 0) + 1
+                best = None
+                best_count = 0
+                for x, c in counts.items():
+                    if c > best_count:
+                        best_count = c
+                        best = x
+                return best
+        """),
+        tests=_d("""
+            import pytest
+            def test_clear_mode(): assert solution([1,2,2,3]) == 2
+            def test_single(): assert solution([1]) == 1
+            def test_first_encountered_wins():
+                result = solution([3,3,2,2,1])
+                assert result == 3
+            def test_all_same(): assert solution([5,5,5]) == 5
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("c > best_count", "c < best_count",
+             "wrong_operator", "returns least frequent element instead of most frequent"),
+            ("counts.get(x, 0) + 1", "counts.get(x, 0) - 1",
+             "wrong_operator", "decrements count instead of incrementing"),
+            ("c > best_count", "c >= best_count",
+             "wrong_operator", "tie-breaking changes: returns last max element instead of first, so [3,3,2,2,1] returns 2 not 3"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_all_unique",
+        spec="Return True if all elements in lst are distinct. Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("lst must not be empty")
+                return len(lst) == len(set(lst))
+        """),
+        tests=_d("""
+            import pytest
+            def test_all_unique(): assert solution([1,2,3]) == True
+            def test_has_duplicate(): assert solution([1,2,1]) == False
+            def test_single(): assert solution([1]) == True
+            def test_all_same(): assert solution([2,2,2]) == False
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("len(lst) == len(set(lst))", "len(lst) != len(set(lst))",
+             "wrong_operator", "returns True when duplicates exist and False when all unique"),
+            ("len(lst) == len(set(lst))", "len(lst) - 1 == len(set(lst))",
+             "wrong_operator", "off by one: single-element list returns False"),
+            ("len(lst) == len(set(lst))", "len(lst) == len(set(lst)) + 1",
+             "wrong_operator", "always returns False since len(lst) can never equal len(set)+1 when all unique"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_intersection_count",
+        spec="Count elements common to both lists a and b (set intersection, no multiplicity). Raise ValueError if either is empty.",
+        correct=_d("""
+            def solution(a, b):
+                if not a or not b: raise ValueError("lists must not be empty")
+                return len(set(a) & set(b))
+        """),
+        tests=_d("""
+            import pytest
+            def test_two_common(): assert solution([1,2,3], [2,3,4]) == 2
+            def test_no_common(): assert solution([1,2], [3,4]) == 0
+            def test_with_duplicates(): assert solution([1,1,2], [1,2,2]) == 2
+            def test_all_common(): assert solution([1,2], [1,2]) == 2
+            def test_empty_a_raises():
+                with pytest.raises(ValueError): solution([], [1,2])
+            def test_empty_b_raises():
+                with pytest.raises(ValueError): solution([1,2], [])
+        """),
+        patches=[
+            ("set(a) & set(b)", "set(a) | set(b)",
+             "wrong_operator", "returns union count instead of intersection count"),
+            ("set(a) & set(b)", "set(a) - set(b)",
+             "wrong_operator", "returns set difference count instead of intersection count"),
+            ("not a or not b", "not a and not b",
+             "wrong_operator", "only raises if BOTH lists are empty, not just one"),
+            ("if not a or not b: raise ValueError(\"lists must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_majority_element",
+        spec="Return element appearing > n//2 times, or None if none. Raise ValueError if lst is empty.",
+        correct=_d("""
+            def solution(lst):
+                if not lst: raise ValueError("lst must not be empty")
+                n = len(lst)
+                counts = {}
+                for x in lst:
+                    counts[x] = counts.get(x, 0) + 1
+                for x, c in counts.items():
+                    if c > n // 2:
+                        return x
+                return None
+        """),
+        tests=_d("""
+            import pytest
+            def test_has_majority(): assert solution([3,3,4,2,3]) == 3
+            def test_no_majority(): assert solution([1,2,3,4]) is None
+            def test_single(): assert solution([1]) == 1
+            def test_even_no_majority(): assert solution([1,2,1,2]) is None
+            def test_three_same(): assert solution([2,2,2]) == 2
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("c > n // 2", "c >= n // 2",
+             "wrong_operator", "[2,2] has n=2, c=2>=1 returns 2 incorrectly instead of None"),
+            ("c > n // 2", "c > n",
+             "wrong_operator", "c can never exceed n so always returns None"),
+            ("counts.get(x, 0) + 1", "counts.get(x, 0) + 2",
+             "wrong_operator", "double-increments count, inflating all frequencies"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_count_anagram_pairs",
+        spec="Count pairs (i,j) i<j in words list where words[i] and words[j] are anagrams. Raise ValueError if fewer than 2 words.",
+        correct=_d("""
+            def solution(words):
+                if len(words) < 2: raise ValueError("need at least 2 words")
+                count = 0
+                for i in range(len(words) - 1):
+                    for j in range(i + 1, len(words)):
+                        if sorted(words[i]) == sorted(words[j]):
+                            count += 1
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_multiple_pairs():
+                assert solution(["eat","tea","tan","ate","nat","bat"]) == 4
+            def test_one_pair(): assert solution(["ab","ba"]) == 1
+            def test_no_pairs(): assert solution(["abc","def"]) == 0
+            def test_too_few_raises():
+                with pytest.raises(ValueError): solution(["only"])
+            def test_empty_raises():
+                with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("sorted(words[i]) == sorted(words[j])", "sorted(words[i]) != sorted(words[j])",
+             "wrong_operator", "counts non-anagram pairs instead of anagram pairs"),
+            ("range(len(words) - 1)", "range(len(words))",
+             "off_by_one", "outer loop goes to last index, inner range(i+1,len) is empty but allows i==len-1"),
+            ("range(i + 1, len(words))", "range(i, len(words))",
+             "off_by_one", "includes i==j case, comparing word to itself"),
+            ("count += 1", "count += 2",
+             "wrong_operator", "double-counts each anagram pair"),
+            ("if len(words) < 2: raise ValueError(\"need at least 2 words\")\n            ", "",
+             "dropped_guard", "removes the too-few words guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_count_substring_occurrences",
+        spec="Count non-overlapping occurrences of pattern in s. Raise ValueError if pattern is empty.",
+        correct=_d("""
+            def solution(s, pattern):
+                if not pattern: raise ValueError("pattern must not be empty")
+                if not s: return 0
+                count = 0
+                start = 0
+                while start <= len(s) - len(pattern):
+                    idx = s.find(pattern, start)
+                    if idx == -1: break
+                    count += 1
+                    start = idx + len(pattern)
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_multiple(): assert solution("aababab", "ab") == 3
+            def test_non_overlapping(): assert solution("aaaa", "aa") == 2
+            def test_not_found(): assert solution("hello", "xyz") == 0
+            def test_empty_string(): assert solution("", "x") == 0
+            def test_empty_pattern_raises():
+                with pytest.raises(ValueError): solution("hello", "")
+            def test_single_char(): assert solution("aaaa", "a") == 4
+            def test_full_match(): assert solution("ab", "ab") == 1
+        """),
+        patches=[
+            ("start = idx + len(pattern)", "start = idx + 1",
+             "wrong_operator", "allows overlapping matches, so 'aaaa'/'aa' returns 3 instead of 2"),
+            ("start <= len(s) - len(pattern)", "start < len(s) - len(pattern)",
+             "wrong_operator", "misses the last valid starting position"),
+            ("count += 1", "count += 2",
+             "wrong_operator", "double-counts every occurrence"),
+            ("if not pattern: raise ValueError(\"pattern must not be empty\")\n            ", "",
+             "dropped_guard", "removes the empty pattern guard"),
+            ("idx == -1", "idx != -1",
+             "wrong_operator", "breaks when pattern is found instead of when not found"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_is_subsequence",
+        spec="Return True if s is a subsequence of t. Raise ValueError if either s or t is empty.",
+        correct=_d("""
+                def solution(s, t):
+                    if not s or not t: raise ValueError("s and t must not be empty")
+                    i = 0
+                    for c in t:
+                        if i < len(s) and c == s[i]:
+                            i += 1
+                    return i == len(s)
+        """),
+        tests=_d("""
+                import pytest
+                def test_true():       assert solution("ace", "abcde") == True
+                def test_false():      assert solution("aec", "abcde") == False
+                def test_exact():      assert solution("abc", "abc") == True
+                def test_single():     assert solution("b", "abc") == True
+                def test_missing():    assert solution("z", "abc") == False
+                def test_empty_s():
+                    with pytest.raises(ValueError): solution("", "abc")
+                def test_empty_t():
+                    with pytest.raises(ValueError): solution("abc", "")
+        """),
+        patches=[
+            ("c == s[i]", "c != s[i]", "wrong_operator", "!= advances index when chars differ instead of match"),
+            ("i == len(s)", "i != len(s)", "wrong_operator", "inverts final check, returns True when not all matched"),
+            ("i += 1", "i += 2", "off_by_one", "skips every other character in s"),
+            ("c == s[i]", "c == s[i - 1]", "off_by_one", "compares against previous index in s"),
+            ("if not s or not t: raise ValueError(\"s and t must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty string guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_caesar_cipher",
+        spec="Shift each letter in s by k positions (mod 26), preserving case and non-letters. Raise ValueError if k is negative.",
+        correct=_d("""
+                def solution(s, k):
+                    if k < 0: raise ValueError("k must be non-negative")
+                    k = k % 26
+                    result = []
+                    for c in s:
+                        if c.isalpha():
+                            base = ord('A') if c.isupper() else ord('a')
+                            result.append(chr((ord(c) - base + k) % 26 + base))
+                        else:
+                            result.append(c)
+                    return ''.join(result)
+        """),
+        tests=_d("""
+                import pytest
+                def test_shift_1():     assert solution("abc", 1) == "bcd"
+                def test_wrap():        assert solution("xyz", 3) == "abc"
+                def test_mixed():       assert solution("Hello!", 2) == "Jgnnq!"
+                def test_full_cycle():  assert solution("ABC", 26) == "ABC"
+                def test_zero():        assert solution("abc", 0) == "abc"
+                def test_negative():
+                    with pytest.raises(ValueError): solution("abc", -1)
+        """),
+        patches=[
+            ("ord(c) - base + k", "ord(c) - base - k", "wrong_operator", "shifts backwards instead of forwards"),
+            ("% 26 + base", "% 26 - base", "wrong_operator", "subtracts base instead of adding, giving wrong ordinals"),
+            ("ord(c) - base + k", "ord(c) + base + k", "wrong_operator", "adds base instead of subtracting, wrong offset"),
+            ("if k < 0: raise ValueError(\"k must be non-negative\")\n                ", "",
+             "dropped_guard", "remove negative k guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_remove_consecutive_duplicates",
+        spec="Remove consecutive duplicate characters from string s. Raise ValueError if s is empty.",
+        correct=_d("""
+                def solution(s):
+                    if not s: raise ValueError("s must not be empty")
+                    result = [s[0]]
+                    for c in s[1:]:
+                        if c != result[-1]:
+                            result.append(c)
+                    return ''.join(result)
+        """),
+        tests=_d("""
+                import pytest
+                def test_basic():     assert solution("aabbcc") == "abc"
+                def test_no_dup():    assert solution("abcd") == "abcd"
+                def test_all_same():  assert solution("aaa") == "a"
+                def test_alternating():assert solution("aba") == "aba"
+                def test_single():    assert solution("x") == "x"
+                def test_empty():
+                    with pytest.raises(ValueError): solution("")
+        """),
+        patches=[
+            ("c != result[-1]", "c == result[-1]", "wrong_operator", "keeps duplicates instead of removing them"),
+            ("result[-1]", "result[0]", "wrong_operator", "compares to first character always, not previous"),
+            ("if not s: raise ValueError(\"s must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty string guard"),
+            ("s[1:]", "s", "off_by_one", "starts loop from s[0], comparing s[0] to result[-1] which is s[0]"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_longest_palindromic_length",
+        spec="Return the length of the longest palindromic substring of s. Raise ValueError if s is empty.",
+        correct=_d("""
+                def solution(s):
+                    if not s: raise ValueError("s must not be empty")
+                    n = len(s)
+                    best = 1
+                    for center in range(n):
+                        lo, hi = center, center
+                        while lo >= 0 and hi < n and s[lo] == s[hi]:
+                            best = max(best, hi - lo + 1)
+                            lo -= 1
+                            hi += 1
+                        lo, hi = center, center + 1
+                        while lo >= 0 and hi < n and s[lo] == s[hi]:
+                            best = max(best, hi - lo + 1)
+                            lo -= 1
+                            hi += 1
+                    return best
+        """),
+        tests=_d("""
+                import pytest
+                def test_babad():    assert solution("babad") == 3
+                def test_cbbd():     assert solution("cbbd") == 2
+                def test_single():   assert solution("a") == 1
+                def test_racecar():  assert solution("racecar") == 7
+                def test_no_pal():   assert solution("abcd") == 1
+                def test_empty():
+                    with pytest.raises(ValueError): solution("")
+        """),
+        patches=[
+            ("hi - lo + 1", "hi - lo", "off_by_one", "undercounts palindrome length by 1"),
+            ("s[lo] == s[hi]", "s[lo] != s[hi]", "wrong_operator", "expands when characters differ instead of match"),
+            ("lo >= 0", "lo > 0", "wrong_operator", "stops expansion one step too early"),
+            ("hi < n", "hi <= n", "wrong_operator", "allows out-of-bounds index access"),
+            ("if not s: raise ValueError(\"s must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty string guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_capitalize_words",
+        spec="Return s with the first letter of each whitespace-separated word capitalized and the rest lowercase. Raise ValueError if s is empty.",
+        correct=_d("""
+                def solution(s):
+                    if not s: raise ValueError("s must not be empty")
+                    return ' '.join(word[0].upper() + word[1:].lower() if word else word for word in s.split(' '))
+        """),
+        tests=_d("""
+                import pytest
+                def test_basic():     assert solution("hello world") == "Hello World"
+                def test_upper():     assert solution("HELLO") == "Hello"
+                def test_mixed():     assert solution("already Capital") == "Already Capital"
+                def test_single():    assert solution("x") == "X"
+                def test_empty():
+                    with pytest.raises(ValueError): solution("")
+        """),
+        patches=[
+            ("word[0].upper()", "word[0].lower()", "wrong_operator", "lowercases first letter instead of uppercasing"),
+            ("word[1:].lower()", "word[1:].upper()", "wrong_operator", "uppercases rest instead of lowercasing"),
+            ("if not s: raise ValueError(\"s must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty string guard"),
+            ("s.split(' ')", "s.split()", "wrong_operator", "split() removes multiple spaces differently than split(' ')"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_manhattan_distance",
+        spec="Return the Manhattan distance between points (x1, y1) and (x2, y2): abs(x1-x2) + abs(y1-y2).",
+        correct=_d("""
+                def solution(x1, y1, x2, y2):
+                    return abs(x1 - x2) + abs(y1 - y2)
+        """),
+        tests=_d("""
+                def test_basic():      assert solution(0, 0, 3, 4) == 7
+                def test_same():       assert solution(1, 1, 1, 1) == 0
+                def test_negative():   assert solution(-1, -1, 1, 1) == 4
+                def test_neg_target(): assert solution(0, 0, -3, -4) == 7
+                def test_axis():       assert solution(0, 0, 5, 0) == 5
+        """),
+        patches=[
+            ("abs(x1 - x2) + abs(y1 - y2)", "abs(x1 + x2) + abs(y1 + y2)", "wrong_operator", "adds coordinates instead of subtracting"),
+            ("abs(x1 - x2) + abs(y1 - y2)", "abs(x1 - x2) * abs(y1 - y2)", "wrong_operator", "multiplies axis distances instead of summing"),
+            ("abs(x1 - x2) + abs(y1 - y2)", "(x1 - x2) ** 2 + (y1 - y2) ** 2", "wrong_operator", "computes squared Euclidean distance instead of Manhattan"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_rectangle_area",
+        spec="Return the area of an axis-aligned rectangle given bottom-left (x1, y1) and top-right (x2, y2). Raise ValueError if x1>=x2 or y1>=y2.",
+        correct=_d("""
+                def solution(x1, y1, x2, y2):
+                    if x1 >= x2: raise ValueError("x1 must be less than x2")
+                    if y1 >= y2: raise ValueError("y1 must be less than y2")
+                    return (x2 - x1) * (y2 - y1)
+        """),
+        tests=_d("""
+                import pytest
+                def test_basic():   assert solution(0, 0, 3, 4) == 12
+                def test_small():   assert solution(1, 1, 4, 3) == 6
+                def test_unit():    assert solution(0, 0, 1, 1) == 1
+                def test_bad_x():
+                    with pytest.raises(ValueError): solution(3, 0, 1, 4)
+                def test_bad_y():
+                    with pytest.raises(ValueError): solution(0, 4, 3, 1)
+                def test_equal_x():
+                    with pytest.raises(ValueError): solution(1, 0, 1, 4)
+                def test_equal_y():
+                    with pytest.raises(ValueError): solution(0, 1, 3, 1)
+        """),
+        patches=[
+            ("(x2 - x1) * (y2 - y1)", "(x2 + x1) * (y2 + y1)", "wrong_operator", "adds coordinates instead of computing dimensions"),
+            ("(x2 - x1) * (y2 - y1)", "(x2 - x1) + (y2 - y1)", "wrong_operator", "computes half-perimeter instead of area"),
+            ("x1 >= x2", "x1 > x2", "wrong_operator", "allows equal x1==x2, producing zero-area rectangle"),
+            ("y1 >= y2", "y1 > y2", "wrong_operator", "allows equal y1==y2, producing zero-area rectangle"),
+            ("if x1 >= x2: raise ValueError(\"x1 must be less than x2\")\n                ", "",
+             "dropped_guard", "remove x1>=x2 guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_are_collinear",
+        spec="Return True if three points (x1,y1), (x2,y2), (x3,y3) are collinear using the cross product test.",
+        correct=_d("""
+                def solution(x1, y1, x2, y2, x3, y3):
+                    return (x2 - x1) * (y3 - y1) == (x3 - x1) * (y2 - y1)
+        """),
+        tests=_d("""
+                def test_collinear_diag():    assert solution(0, 0, 1, 1, 2, 2) == True
+                def test_not_collinear():     assert solution(0, 0, 1, 0, 2, 1) == False
+                def test_vertical():          assert solution(0, 0, 0, 1, 0, 2) == True
+                def test_same_point():        assert solution(1, 1, 1, 1, 1, 1) == True
+                def test_not_col2():          assert solution(0, 0, 1, 2, 3, 1) == False
+        """),
+        patches=[
+            ("(x2 - x1) * (y3 - y1) == (x3 - x1) * (y2 - y1)",
+             "(x2 - x1) * (y3 - y1) != (x3 - x1) * (y2 - y1)",
+             "wrong_operator", "inverts result, returns True when not collinear"),
+            ("(x2 - x1) * (y3 - y1)", "(x2 + x1) * (y3 + y1)", "wrong_operator", "uses addition instead of subtraction in cross product"),
+            ("(x2 - x1) * (y3 - y1) == (x3 - x1) * (y2 - y1)",
+             "(x2 - x1) * (y3 - y1) < (x3 - x1) * (y2 - y1)",
+             "wrong_operator", "uses < instead of == for cross product comparison"),
+            ("(y3 - y1)", "(y3 + y1)", "wrong_operator", "adds y1 instead of subtracting in cross product term"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_staircase_ways",
+        spec="Count the number of ways to climb n stairs taking 1 or 2 steps at a time. Raise ValueError if n <= 0.",
+        correct=_d("""
+                def solution(n):
+                    if n <= 0: raise ValueError("n must be positive")
+                    if n == 1: return 1
+                    a, b = 1, 1
+                    for _ in range(2, n + 1):
+                        a, b = b, a + b
+                    return b
+        """),
+        tests=_d("""
+                import pytest
+                def test_n1():  assert solution(1) == 1
+                def test_n2():  assert solution(2) == 2
+                def test_n3():  assert solution(3) == 3
+                def test_n4():  assert solution(4) == 5
+                def test_n5():  assert solution(5) == 8
+                def test_zero():
+                    with pytest.raises(ValueError): solution(0)
+                def test_neg():
+                    with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("a + b", "a * b", "wrong_operator", "multiplies instead of adds fibonacci recurrence"),
+            ("a + b", "a - b", "wrong_operator", "subtracts instead of adds fibonacci recurrence"),
+            ("a, b = b, a + b", "a, b = a + b, b", "swapped_args", "assigns sum to a instead of b, leaving b unchanged"),
+            ("range(2, n + 1)", "range(2, n)", "off_by_one", "loop stops one step short, missing last fibonacci step"),
+            ("if n <= 0: raise ValueError(\"n must be positive\")\n                ", "",
+             "dropped_guard", "remove non-positive n guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_lis_length",
+        spec="Return the length of the longest strictly increasing subsequence in lst. Raise ValueError if lst is empty.",
+        correct=_d("""
+                def solution(lst):
+                    if not lst: raise ValueError("lst must not be empty")
+                    n = len(lst)
+                    dp = [1] * n
+                    for i in range(1, n):
+                        for j in range(i):
+                            if lst[j] < lst[i]:
+                                if dp[j] + 1 > dp[i]:
+                                    dp[i] = dp[j] + 1
+                    return max(dp)
+        """),
+        tests=_d("""
+                import pytest
+                def test_basic():     assert solution([3, 1, 2]) == 2
+                def test_sorted():    assert solution([1, 2, 3, 4]) == 4
+                def test_reverse():   assert solution([4, 3, 2, 1]) == 1
+                def test_equal():     assert solution([2, 2, 2]) == 1
+                def test_mixed():     assert solution([1, 3, 2, 3, 1, 4]) == 4
+                def test_empty():
+                    with pytest.raises(ValueError): solution([])
+        """),
+        patches=[
+            ("lst[j] < lst[i]", "lst[j] <= lst[i]", "wrong_operator", "allows equal elements, finds non-strictly increasing subsequence"),
+            ("lst[j] < lst[i]", "lst[j] > lst[i]", "wrong_operator", "finds longest decreasing subsequence instead"),
+            ("dp[j] + 1 > dp[i]", "dp[j] + 1 < dp[i]", "wrong_operator", "updates only when new length is smaller, keeps minimum"),
+            ("if not lst: raise ValueError(\"lst must not be empty\")\n                ", "",
+             "dropped_guard", "remove empty list guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_closest_pair_distance",
+        spec="Return the minimum Euclidean distance between any two points in the list. Raise ValueError if fewer than 2 points.",
+        correct=_d("""
+            def solution(points):
+                import math
+                if len(points) < 2: raise ValueError("need at least 2 points")\n                min_dist = float("inf")
+                n = len(points)
+                for i in range(n - 1):
+                    for j in range(i + 1, n):
+                        dx = points[i][0] - points[j][0]
+                        dy = points[i][1] - points[j][1]
+                        d = math.sqrt(dx * dx + dy * dy)
+                        if d < min_dist:
+                            min_dist = d
+                return min_dist
+        """),
+        tests=_d("""
+            import pytest, math
+            def test_basic():    assert solution([(0,0),(3,4)]) == pytest.approx(5.0)
+            def test_unit():     assert solution([(0,0),(1,0),(0,1)]) == pytest.approx(1.0)
+            def test_two():      assert solution([(1,1),(4,5)]) == pytest.approx(5.0)
+            def test_three():    assert solution([(0,0),(1,1),(10,10)]) == pytest.approx(math.sqrt(2))
+            def test_neg():      assert solution([(-1,-1),(1,1)]) == pytest.approx(math.sqrt(8))
+            def test_short():
+                with pytest.raises(ValueError): solution([(0,0)])
+        """),
+        patches=[
+            ("dx * dx + dy * dy",   "dx * dx - dy * dy",  "wrong_operator", "subtraction breaks distance calculation"),
+            ("if d < min_dist:",     "if d > min_dist:",    "wrong_operator", "finds maximum distance instead of minimum"),
+            ("dx = points[i][0] - points[j][0]", "dx = points[i][0] + points[j][0]", "wrong_operator", "addition instead of subtraction for dx"),
+            ("range(n - 1)",         "range(n)",            "off_by_one",    "outer loop includes last index — j loops out of useful range"),
+            ("if len(points) < 2: raise ValueError(\"need at least 2 points\")\n                ", "",
+             "dropped_guard", "remove minimum-points guard"),
+        ],
+    ),
+
+    _TaskDef(
+        task_id="full_min_coins",
+        spec="Return minimum coins to make amount using denominations [1,5,10,25] (greedy, canonical set). Raise ValueError if amount < 0.",
+        correct=_d("""
+            def solution(amount):
+                if amount < 0: raise ValueError("amount must be non-negative")
+                coins = [25, 10, 5, 1]
+                count = 0
+                for coin in coins:
+                    count += amount // coin
+                    amount %= coin
+                return count
+        """),
+        tests=_d("""
+            import pytest
+            def test_zero():     assert solution(0) == 0
+            def test_one():      assert solution(1) == 1
+            def test_five():     assert solution(5) == 1
+            def test_thirty():   assert solution(30) == 2
+            def test_eleven():   assert solution(11) == 2
+            def test_fortyone(): assert solution(41) == 4
+            def test_neg():
+                with pytest.raises(ValueError): solution(-1)
+        """),
+        patches=[
+            ("amount // coin",  "amount % coin",    "wrong_operator", "modulo instead of floor division gives wrong coin count"),
+            ("amount %= coin",  "amount //= coin",  "wrong_operator", "floor division instead of modulo gives wrong remainder"),
+            ("count += amount // coin", "count -= amount // coin", "wrong_operator", "subtract instead of add gives negative count"),
+            ("if amount < 0: raise ValueError(\"amount must be non-negative\")\n                ", "",
+             "dropped_guard", "remove negative guard"),
+            ("coins = [25, 10, 5, 1]", "coins = [1, 5, 10, 25]", "swapped_args", "ascending order causes greedy to pick smallest coins first"),
+        ],
+    ),
+
 ]  # end _TASKS
 
 
