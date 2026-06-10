@@ -159,3 +159,88 @@ Goes into Limitations, not Results. Verbatim:
 > We document H3 as a limitation of the original design and do NOT substitute
 > a post-hoc metric. φ-based diversity analysis remains valid for H1/H2
 > (LLM × LLM, both error-prone). Empirical basis: ruff 0/20, logged 2026-06-04.
+
+---
+
+## Amendment 3 — Corpus expansion for wrong_operator class (2026-06-10)
+
+**Status:** LOCKED before any new tasks are generated  
+**Nature:** Planned corpus expansion — not a post-hoc metric substitution  
+**Triggered by:** per-class count review after Phase 2 H1 completion
+
+### Situation
+
+After corpus rebuild, per-class counts are:
+
+| Class | n (current) | vs target_n=170 (H2) | vs target_n_h1=80 (H1) |
+|-------|-------------|----------------------|------------------------|
+| wrong_operator | 82 | **underpowered** (−88) | powered ✅ |
+| off_by_one | 77 | underpowered (−93) | underpowered |
+| dropped_guard | 48 | underpowered (−122) | underpowered |
+| swapped_args | 29 | underpowered (−141) | underpowered |
+
+H2 (inter-capability: Haiku vs Sonnet) requires `target_n=170` per class.
+No class currently meets this threshold.
+
+### Decision
+
+**Only `wrong_operator` is expanded to `target_n=170`.**
+
+Rationale (all locked pre-generation):
+1. wrong_operator is the most populated class — smallest expansion gap (−88).
+2. wrong_operator is already powered for H1 (82 ≥ 80 = `target_n_h1`),
+   minimising interaction with completed H1 measurement.
+3. The remaining three classes (off_by_one, dropped_guard, swapped_args)
+   remain UNDERPOWERED for H2 and are reported as a **documented limitation**,
+   not patched.
+
+### Rules of the expansion (binding)
+
+1. **Only new base tasks are added** — hand-authored `_TaskDef` objects appended
+   to `_TASKS` in `full_corpus.py`. No changes to existing task definitions.
+2. **Mutation rules unchanged** — same patch-based mechanism, same
+   `verify_mutation` / `verify_gt` logic, same EQUIV-discard criterion.
+3. **Seeds unchanged** — `corpus: 0`, `bootstrap: 0`, `judge_run: 42`
+   as registered in `experiment.yaml`.
+4. **Decoding unchanged** — `temperature=0.0`, `max_tokens=256` for all models.
+5. **New tasks are structurally identical** to existing tasks: single Python
+   function, hidden pytest suite, patches of the form `(old_text, new_text,
+   defect_type, description)`. No novel defect semantics introduced.
+6. **Stopping rule:** exactly **N = 50 new tasks** are authored and committed
+   before any corpus build is run. Rationale: need +88 valid wrong_operator
+   items; observed yield is ~2.05 wrong_operator items/task; 43 tasks would
+   suffice at yield floor, 50 tasks adds ~15% buffer for EQUIV-discard variance.
+   After build, if wrong_operator count ≥ 170 — expansion is complete.
+   If count < 170 — the shortfall is documented as a limitation; **no further
+   tasks are added in a second iteration.** One-shot rule, no peek-and-add.
+7. **Selection of task domains** is determined before building: new tasks cover
+   algorithmic domains not yet represented in the 40-task corpus. Tasks are
+   NOT selected or rejected based on their per-class mutation yield.
+
+### Effect on already-completed H1 measurement
+
+H1 on wrong_operator is already measured and locked:
+`phi = +1.000, CI = [1.000, 1.000], n = 82, verdict = DUPLICATE ✅ (2026-06-05)`
+
+The expansion adds items that **will be judged in future H1 and H2 runs**
+on the extended corpus. Both results are preserved in the record:
+
+- `h1_pre_expansion`: n = 82, phi = +1.000, CI = [1.000, 1.000] — **primary
+  H1 outcome**, locked, not overwritten.
+- `h1_post_expansion`: H1 re-run on expanded corpus (n ≈ 170), reported
+  alongside pre-expansion result, expected to be consistent. If inconsistent,
+  the discrepancy is reported verbatim — not resolved by selective reporting.
+
+No H2 data existed at the time of this amendment — H2 has not been run.
+Expansion therefore cannot constitute post-hoc adjustment of H2.
+
+### Limitation statement (mandatory in paper)
+
+> Corpus expansion was performed for `wrong_operator` only, reaching
+> `target_n=170` for H2. Three classes (off_by_one, dropped_guard, swapped_args)
+> remain underpowered for H2 (n = 77, 48, 29 respectively vs target 170) and
+> are reported as UNDERPOWERED in Table 2 with verdict INCONCLUSIVE on H2.
+> Expansion was pre-registered before generation and follows identical
+> mutation and verification rules as the original corpus. New tasks were
+> authored in a single batch of N = 50 before any corpus build was run
+> (one-shot, no peek-and-add).
