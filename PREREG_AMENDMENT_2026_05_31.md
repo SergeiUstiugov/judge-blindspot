@@ -244,3 +244,114 @@ Expansion therefore cannot constitute post-hoc adjustment of H2.
 > mutation and verification rules as the original corpus. New tasks were
 > authored in a single batch of N = 50 before any corpus build was run
 > (one-shot, no peek-and-add).
+
+---
+
+## Amendment 4 — H2 axis substitution: inter_capability → inter_family (2026-06-11)
+
+**Status:** LOCKED before any H2 run  
+**Nature:** Axis substitution forced by API access failure — not a post-hoc metric change  
+**Triggered by:** Anthropic API balance exhausted; inter-capability pair
+(claude-haiku-4-5-20251001 × claude-sonnet-4-6) unreachable without cloud credits
+
+### Situation
+
+H2 as pre-registered in experiment.yaml requires:
+
+```
+pair:     claude-haiku-4-5-20251001 × claude-sonnet-4-6
+provider: anthropic (cloud API)
+axis:     inter_capability
+```
+
+A smoke run attempted on 2026-06-11 confirmed: ANTHROPIC_API_KEY is valid and
+authenticated (no 401), but account balance = 0 → HTTP 400:
+
+```
+"Your credit balance is too low to access the Anthropic API."
+```
+
+No H2 data exists at the time of this amendment.
+The substitution below is therefore NOT post-hoc adjustment — no results are
+available to peek at or fit.
+
+### Substitution
+
+| Property | Original (pre-reg) | Amendment 4 |
+|---|---|---|
+| Axis label | inter_capability | inter_family |
+| Judge A | claude-haiku-4-5-20251001 (Anthropic) | qwen2.5-coder:7b (Alibaba/Qwen) |
+| Judge B | claude-sonnet-4-6 (Anthropic) | deepseek-coder:6.7b (DeepSeek) |
+| Provider | anthropic (cloud) | ollama (local) |
+| Mechanism | Same training lineage, different capability tier | Different training teams, similar capability tier |
+| Reason for change | — | API access failure (no balance) |
+
+### Justification: inter-family is a valid H2 test
+
+The pre-registered H2 question is:
+
+> "Do LLM judges share blind spots on the same defect class?"
+
+Mechanism in original pair: same provider → shared pre-training data, shared RLHF
+process, different capability tier (Haiku < Sonnet) → tests whether models of
+different strength from the same lineage share blind spots.
+
+Mechanism in substituted pair: different organizations (Alibaba vs DeepSeek),
+different pre-training corpora and fine-tuning pipelines, similar capability tier
+(~7B params, both coding-specialized) → tests whether models of different training
+lineage share blind spots.
+
+This shifts the axis from capability-tier difference to training-lineage difference —
+a related but not identical question. We report and interpret H2 strictly in
+inter-family terms, not as a substitute measurement of the original inter-capability
+question.
+
+`qwen2.5-coder:7b`: Alibaba, Qwen family, coding-specialized, 7B params  
+`deepseek-coder:6.7b`: DeepSeek, separate training team/data, coding-specialized, 6.7B params
+
+Choosing coding-specialized models of similar size deliberately controls for
+capability tier, isolating training lineage as the axis of variation.
+
+Honest caveat: inter-family independence is also plausible (φ near 0 → INDEPENDENT),
+making this a genuinely uncertain test. The INDEPENDENT verdict is a valid and
+informative outcome, not a null-result failure.
+
+### What does NOT change
+
+- Metric: φ (Kuncheva-Whitaker double-fault correlation) — unchanged
+- Pre-registered verdict rule: DUPLICATE / OVERLAP / INDEPENDENT / INCONCLUSIVE — unchanged
+- Expected zone for H2: 0.2 < φ < 0.7 (OVERLAP) — unchanged
+- target_n = 170 — unchanged; corpus wrong_operator = 195 → POWERED
+- Bootstrap: 2000 resamples, seed=0 — unchanged
+- Corpus: data/full_corpus.jsonl, --class wrong_operator — unchanged
+- Prompt: prompts/strict_passfail.txt — unchanged
+
+### What changes (disclosed, not minimized)
+
+- **Conceptual shift:** the axis now tests lineage-difference, not
+  capability-difference. This is disclosed, not minimized.
+- **Pair:** cloud Anthropic models → local Ollama models of different families
+- **Reproducibility:** non-deterministic (no seed support on Anthropic API) →
+  fully deterministic (seed=42 via Ollama)
+- **Axis label** in experiment.yaml: `inter_capability` → `inter_family`
+
+### Reproducibility gain
+
+Original Anthropic pair: temperature=0 reduces variance but seed not supported →
+non-deterministic across runs.
+
+Substituted Ollama pair: seed=42 (experiment.yaml `judge_run: 42`) is fully
+deterministic → exact reproduction of every verdict on every item.
+
+### Paper disclosure (mandatory)
+
+> H2 was originally pre-registered as inter-capability (claude-haiku-4-5-20251001
+> vs claude-sonnet-4-6, Anthropic API). Prior to any H2 run, cloud API access
+> became unavailable (zero credit balance). Under Amendment 4 (locked 2026-06-11,
+> before any data collection), H2 is redesignated as inter-family:
+> qwen2.5-coder:7b (Alibaba/Qwen) vs deepseek-coder:6.7b (DeepSeek), run locally
+> via Ollama. This shifts the axis from capability-tier difference to
+> training-lineage difference — a related but not identical question. We report
+> and interpret H2 strictly in inter-family terms, not as a substitute measurement
+> of the original inter-capability question. The metric (φ), decision rule, corpus,
+> and target_n are unchanged. No H2 data existed at the time of the amendment.

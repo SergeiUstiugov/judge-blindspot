@@ -7,8 +7,14 @@
 #                → expected phi ≈ +1 (positive control / H1)
 #                REQUIRES a local model (cloud APIs do not guarantee seed reproducibility)
 #
-# inter-capability : Haiku vs Sonnet (same provider, different capability tier)
-#                → H2: expect 0.2 < phi < 0.7 (shared training → shared blind spots)
+# inter-family : qwen2.5-coder:7b (Alibaba/Qwen) vs deepseek-coder:6.7b (DeepSeek)
+#                → H2: expect 0.2 < phi < 0.7 (shared training corpus → shared blind spots)
+#                → axis tests training-lineage difference, not capability-tier difference
+#                   (see Amendment 4 in PREREG_AMENDMENT_2026_05_31.md)
+#
+# ORIGINAL (pre-reg, superseded by Amendment 4, 2026-06-11):
+#   inter-capability: claude-haiku-4-5-20251001 × claude-sonnet-4-6 (Anthropic)
+#   Reason for substitution: Anthropic API balance exhausted before any H2 run.
 #
 # cross-type   : LLM judge vs deterministic test runner
 #                → H3: expect phi ≈ 0 (structurally orthogonal)
@@ -28,20 +34,24 @@ models:
       max_tokens:  256
       seed: 42
 
-  # --- inter-capability axis: Haiku vs Sonnet ---
-  - id: claude-haiku-4-5-20251001
-    provider: anthropic
-    axis: inter_capability
+  # --- inter-family axis: qwen2.5-coder:7b x deepseek-coder:6.7b (Amendment 4) ---
+  # Original pair was claude-haiku-4-5-20251001 x claude-sonnet-4-6 (Anthropic).
+  # Substituted 2026-06-11 before any H2 run — see Amendment 4 in PREREG_AMENDMENT_2026_05_31.md.
+  - id: qwen2.5-coder:7b
+    provider: ollama
+    axis: inter_family
     decoding:
       temperature: 0.0
       max_tokens:  256
+      seed: 42
 
-  - id: claude-sonnet-4-6
-    provider: anthropic
-    axis: inter_capability
+  - id: deepseek-coder:6.7b
+    provider: ollama
+    axis: inter_family
     decoding:
       temperature: 0.0
       max_tokens:  256
+      seed: 42
 
   # --- cross-type axis: LLM vs deterministic test runner ---
   # The test runner is not listed here — it uses the hidden_tests from the corpus
