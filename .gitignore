@@ -12,3 +12,5 @@ results/
 !results/h1_wrong_operator/*.json
 !results/h1_off_by_one/
 !results/h1_off_by_one/*.json
+data/smoke*.jsonl
+results/h2_smoke*/
