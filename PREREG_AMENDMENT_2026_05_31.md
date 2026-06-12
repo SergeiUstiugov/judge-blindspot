@@ -355,3 +355,110 @@ deterministic → exact reproduction of every verdict on every item.
 > and interpret H2 strictly in inter-family terms, not as a substitute measurement
 > of the original inter-capability question. The metric (φ), decision rule, corpus,
 > and target_n are unchanged. No H2 data existed at the time of the amendment.
+
+---
+
+## Amendment 5 — H2 NOT COMPLETED: instrument failure at 6-7B judge tier (2026-06-11)
+
+**Status:** LOCKED  
+**Nature:** Instrument failure — judge selection failure, not measurement design failure  
+**Triggered by:** deepseek-coder:6.7b 2/5 INVALID (deferred-judgment); codegen:latest
+replacement also failed validation (hallucination 2/20)
+
+### H2 pair history (explicit transition)
+
+| Step | Pair | Outcome |
+|---|---|---|
+| Amendment 4 (locked 2026-06-11) | qwen2.5-coder:7b × deepseek-coder:6.7b | Registered; smoke test pending |
+| Smoke-5 (2026-06-11) | qwen × deepseek | deepseek 2/5 INVALID (deferred-judgment) → deepseek excluded |
+| Replacement attempt | qwen2.5-coder:7b × codegen:latest | H2 pair respecified deepseek→codegen; both failed validation |
+| Smoke-20 (2026-06-11) | qwen × codegen | qwen: 1/20 code-content hallucination + 1/20 evaluated-own-fix; codegen: 2/20 code-content hallucination → pair excluded |
+
+**H2 pair was respecified deepseek→codegen after deepseek exclusion; both failed
+validation. No H2 measurement was taken under either pair.**
+
+### deepseek-coder:6.7b — exclusion reason
+
+Smoke run (5 items, `data/smoke5_wrong_operator.jsonl`): **2/5 INVALID** due to
+deferred-judgment pattern. The model describes testing methodology conditionally
+instead of committing to PASS/FAIL. `_parse_verdict` correctly rejects this;
+parser is unchanged. `qwen2.5-coder:7b` on the same 5 items: 5/5 clean — this
+is a differential instruction-following property of deepseek-coder:6.7b,
+not a general 7B limitation.
+
+### codegen:latest — exclusion reason
+
+Smoke run (20 items, `data/smoke20_wrong_operator.jsonl`, `--judge-seed 42`).
+Both produce valid verdict tokens (PASS/FAIL); failures are invisible to `_parse_verdict`,
+detectable only by manual reasoning inspection. Cross-family (Alibaba × Salesforce).
+
+**qwen2.5-coder:7b — 2 failures, two distinct mechanisms:**
+- `count_in_range_00`: **code-content hallucination** — asserts a boundary condition
+  the actual code does not have
+- `fibonacci_00`: **evaluated-own-fix** — correctly identifies `a-b` as the defect,
+  then judges a hypothetical corrected version rather than the actual submitted code
+
+qwen code-content hallucination rate: **1/20 (~5%)**. `fibonacci_00` is a separate
+failure mode — the model substitutes what the code *should be* for what it *is*.
+Both failure types produce syntactically valid verdict tokens; both are parser-invisible.
+
+**codegen:latest — 2 failures, code-content hallucination:**
+- `factorial_00`: asserts the code "multiplies" when the actual implementation is `result += i`
+- `count_in_range_01`: asserts boundary inclusion the code does not implement
+
+codegen code-content hallucination rate: **2/20 (~10%)**.
+
+The finding is not "symmetric 10% hallucination across families". Both models are
+unreliable instruments, but through different failure modes. This is the stronger
+result: multiple distinct failure mechanisms, cross-family.
+
+### Decision
+
+**H2 = NOT COMPLETED.**
+
+Neither qwen×deepseek nor qwen×codegen constitutes a reliable binary judge
+instrument at the 6-7B capability tier for semantic mutations on this corpus.
+No further model substitution is attempted — this is documented as an
+**instrument-availability limitation**, not a design failure.
+
+The registered metric (φ), decision rule (DUPLICATE/OVERLAP/INDEPENDENT/INCONCLUSIVE),
+corpus, and target_n are unchanged. H2 joins H3 as NOT EVALUABLE/NOT COMPLETED
+in the paper.
+
+### What does NOT change
+
+- Metric: φ — unchanged  
+- Pre-registered decision rule — unchanged  
+- Corpus: data/full_corpus.jsonl, wrong_operator, n=195 — unchanged  
+- target_n = 170 — unchanged  
+- H1 results — unchanged and unaffected  
+
+### Post-hoc finding (hypothesis-generating, NOT registered)
+
+Instrument validation surfaced a cross-family pattern of 6-7B code-LLM judge
+unreliability. This is documented in `findings/judge_reliability_6b.md` as a
+hypothesis-generating observation. It is NOT a registered result and does NOT
+modify any pre-registered hypothesis. It belongs in the paper's Limitations
+section and may motivate future work on judge calibration.
+
+### Paper placement (Limitations)
+
+> H2 (inter-family: qwen2.5-coder:7b × deepseek-coder:6.7b, Amendment 4) was
+> NOT COMPLETED due to instrument failure. Instrument validation revealed two
+> distinct judge-failure modes at the 6-7B tier: (a) deepseek-coder:6.7b
+> produced deferred-judgment verdicts (2/5 INVALID on a 5-item wrong_operator
+> smoke run) — the model describes testing methodology rather than committing
+> to PASS/FAIL; (b) a replacement pair (qwen2.5-coder:7b × codegen:latest)
+> each failed in 2/20 smoke items via distinct mechanisms: qwen produced 1
+> code-content hallucination (count_in_range_00: boundary condition misread)
+> plus 1 evaluated-own-fix error (fibonacci_00: judged a hypothetical corrected
+> version rather than the actual submitted code `a-b`); codegen produced 2
+> code-content hallucinations (factorial_00, count_in_range_01: operator
+> semantics and boundary inclusion misread). qwen narrow hallucination rate
+> ~5%; codegen ~10%. All failures produced syntactically valid verdict tokens
+> invisible to `_parse_verdict`. Both models are unreliable instruments —
+> through different failure modes, not symmetric hallucination. H2 pair was respecified
+> deepseek→codegen after deepseek exclusion; both pairs failed validation and
+> no H2 measurement was taken. We document H2 as NOT COMPLETED alongside H3
+> (NOT EVALUABLE). See findings/judge_reliability_6b.md for the
+> cross-family hallucination pattern (hypothesis-generating, post-hoc).
