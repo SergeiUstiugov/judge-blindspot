@@ -1,0 +1,23 @@
+{
+  "qwen2.5-coder:7b:f20a49b6c985|deepseek-coder:6.7b:f20a49b6c985": {
+    "phi": NaN,
+    "phi_ci": [
+      NaN,
+      NaN
+    ],
+    "ratio": 1.0,
+    "ratio_ci": [
+      1.0,
+      1.0
+    ],
+    "shuffle_null": 0.0,
+    "marginal_i": 0.3333333333333333,
+    "marginal_j": 1.0,
+    "n": 3,
+    "N00": 0,
+    "N01": 2,
+    "N10": 0,
+    "N11": 1,
+    "verdict": "INCONCLUSIVE"
+  }
+}

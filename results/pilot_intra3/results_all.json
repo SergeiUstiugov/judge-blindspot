@@ -1,0 +1,23 @@
+{
+  "qwen2.5-coder:7b:f20a49b6c985|qwen2.5-coder:7b_clone:f20a49b6c985": {
+    "phi": 1.0,
+    "phi_ci": [
+      0.9999999999999998,
+      1.0
+    ],
+    "ratio": 1.4285714285714286,
+    "ratio_ci": [
+      1.0,
+      2.4999999999999996
+    ],
+    "shuffle_null": 0.0019047619047619705,
+    "marginal_i": 0.7,
+    "marginal_j": 0.7,
+    "n": 10,
+    "N00": 3,
+    "N01": 0,
+    "N10": 0,
+    "N11": 7,
+    "verdict": "INCONCLUSIVE"
+  }
+}

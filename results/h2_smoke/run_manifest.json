@@ -1,0 +1,16 @@
+{
+  "corpus": "data/smoke5_wrong_operator.jsonl",
+  "judges": [
+    "qwen2.5-coder:7b:f20a49b6c985",
+    "deepseek-coder:6.7b:f20a49b6c985"
+  ],
+  "judges_spec": "ollama:qwen2.5-coder:7b,ollama:deepseek-coder:6.7b",
+  "prompt_path": "prompts/strict_passfail.txt",
+  "n_items": 5,
+  "n_valid": 3,
+  "defect_class": "all",
+  "n_boot": 500,
+  "seed": 0,
+  "judge_seed": 42,
+  "ts": "2026-06-11T13:18:22.623684"
+}

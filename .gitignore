@@ -1,16 +1,49 @@
+# --- caches / build ---
 __pycache__/
 *.pyc
+*.pyo
 *.egg-info/
+build/
+dist/
 .pytest_cache/
-results/
-!results/power_sim/
-!results/power_sim/*.json
-!results/power_sim/*.md
-*.csv
-!results/power_sim/*.csv
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- environments / secrets ---
+.env
+.env.*
+*.pem
+*.key
+credentials*
+.venv/
+venv/
+
+# --- editors / OS ---
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+*~
+
+# --- results: publish measurement artifacts, exclude superseded internal runs ---
+results/*
 !results/h1_wrong_operator/
-!results/h1_wrong_operator/*.json
 !results/h1_off_by_one/
-!results/h1_off_by_one/*.json
-data/smoke*.jsonl
-results/h2_smoke*/
+!results/h2_smoke/
+!results/h2_smoke20/
+!results/h2_smoke_codegen/
+!results/pilot_intra3/
+!results/power_sim/
+
+# superseded / incomplete runs (no summary artifact, pre-Amendment-2 gate semantics)
+results/calib_smoke/
+results/calib_real/
+results/pilot_intra/
+results/pilot_intra2/
+
+# empty log from the aborted Anthropic smoke attempt (zero credit balance)
+results/h2_smoke/logs/calls_claude-haiku-4-5-20251001_f20a49b6c985.jsonl
