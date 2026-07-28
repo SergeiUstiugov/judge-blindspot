@@ -241,7 +241,7 @@ judge-blindspot run \
 > To reproduce the published H1 numbers exactly, restore the corpus as it was:
 >
 > ```bash
-> git show 40030c1:data/full_corpus.jsonl > data/full_corpus_276.jsonl
+> git show 242b66e:data/full_corpus.jsonl > data/full_corpus_276.jsonl
 > ```
 >
 > and pass `--corpus data/full_corpus_276.jsonl`. LLM judging is not bit-exact even
