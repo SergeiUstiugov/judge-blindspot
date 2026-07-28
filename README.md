@@ -4,11 +4,18 @@
 
 This repository is the measurement behind one claim: when you ask "the same model
 again" for a second opinion on generated code, you are not buying a second opinion.
-On the classes measured here, the two runs missed **exactly the same items** —
-φ = +1.000, zero disagreements out of 158 judged items.
+On the one class that reached its pre-registered sample size — `wrong_operator`,
+n = 82 — the two runs missed **exactly the same items**: φ = +1.000, not a single
+disagreement. A second, underpowered class shows the same pattern and is reported
+as supporting evidence only, not as confirmation.
 
 Companion code and data for the paper *"Do LLM Judges Share Blind Spots?"*
 and for the pipeline article that cites this repo as its correlation measurement.
+
+**State cited by the Habr article:** tag
+[`habr-article-1-artifact-2026-07`](../../tree/habr-article-1-artifact-2026-07) —
+a frozen snapshot of this repository. The corpus may grow after publication; the
+tag will not, so the article's numbers stay reproducible against it.
 
 > **Кратко (RU):** замер коррелированности ошибок двух клонов одного LLM-судьи.
 > Результат H1: φ = +1.000, ни одного расхождения между прогонками. Основной,
@@ -279,11 +286,11 @@ renaming it would break `pip install -e .`, the CLI, and every test import.
 
 | Directory | What it is |
 |---|---|
-| `results/h1_wrong_operator/` | H1, `wrong_operator` — **primary result**. JSON, table, forest plot, full per-call logs |
-| `results/h1_off_by_one/` | H1, `off_by_one` — **primary result**. Same artifact set |
-| `results/h2_smoke/` | deepseek-coder:6.7b validation smoke (5 items) — why it was excluded |
+| `results/h1_wrong_operator/` | H1, `wrong_operator` — **the citable result** (n = 82, powered, DUPLICATE). JSON, table, forest plot, full per-call logs |
+| `results/h1_off_by_one/` | H1, `off_by_one` — **supporting, UNDERPOWERED** (n = 76 < 80; registered verdict INCONCLUSIVE). Same artifact set |
+| `results/h2_smoke/` | deepseek-coder:6.7b validation smoke (5 items) — **not** an H2 result; why it was excluded |
 | `results/h2_smoke20/` | qwen × codegen validation smoke (20 items) — **not** an H2 result |
-| `results/h2_smoke_codegen/` | codegen replacement smoke |
+| `results/h2_smoke_codegen/` | codegen replacement smoke (5 items) — **not** an H2 result |
 | `results/pilot_intra3/` | pilot that motivated `target_n_h1 = 80` (n = 10, INCONCLUSIVE by rule) |
 | `results/power_sim/` | power simulation: 160-row table, `target_n = 170` |
 
