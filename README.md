@@ -45,6 +45,11 @@ The statistic is the **φ coefficient** (Matthews correlation on the miss-vector
 * **φ = +1** — the judges miss the *same* items. The second judge is an echo. You
   pay twice and learn nothing.
 
+A second statistic, **ratio**, is the joint miss rate divided by the product of the
+two marginal miss rates — `mean(a & b) / (mean(a) * mean(b))` in `stats.py` — so it
+is ≈ 1 when the judges miss independently and > 1 when joint misses are more common
+than independence predicts.
+
 A bootstrap CI (2000 resamples, percentile method, seed = 0) and a pre-registered
 decision rule turn φ into a verdict.
 
@@ -56,6 +61,15 @@ decision rule turn φ into a verdict.
 | **INDEPENDENT** | φ CI covers 0 AND ratio CI covers 1 |
 | **OVERLAP** | CI lower bound > 0 AND φ < 0.7 |
 | **INCONCLUSIVE** | CI half-width > 0.20 OR n < 30 |
+
+The rules are applied top-down, first match wins, in the order INCONCLUSIVE →
+DUPLICATE → INDEPENDENT → OVERLAP, and anything matching none of them falls
+through to INCONCLUSIVE (`verdict.py`, `verdict_for_pair`). This matters for one
+combination the table above does not name: φ ≥ 0.7 with CI half-width in
+(0.15, 0.20] is too wide for DUPLICATE but not wide enough for the explicit
+INCONCLUSIVE branch, and reaches INCONCLUSIVE via the fallback. This line
+documents the behaviour of the code as written; it does not amend the sealed
+rule or its thresholds.
 
 ---
 
@@ -126,9 +140,14 @@ validation *before* measurement, so there was no reliable instrument to measure 
 
 | Candidate | Smoke run | Outcome |
 |---|---|---|
-| `deepseek-coder:6.7b` | 5 items | **2/5 INVALID** — deferred judgment: the model describes what a judge *should* do instead of committing to PASS/FAIL. `qwen` on the same 5 items: 5/5 clean. Excluded. |
-| `codegen:latest` (replacement) | 20 items | **2/20** code-content hallucinations (`factorial_00`, `count_in_range_01`). Excluded. |
-| `qwen2.5-coder:7b` (incumbent) | 20 items | **2/20** — 1 code-content hallucination (`count_in_range_00`) + 1 evaluated-own-fix (`fibonacci_00`: correctly identifies the `a-b` defect, then judges a hypothetical *corrected* version). Excluded. |
+| `deepseek-coder:6.7b` | 5 items — `results/h2_smoke/` | **2/5 INVALID** — deferred judgment: the model describes what a judge *should* do instead of committing to PASS/FAIL. `qwen` on the same 5 items: 5/5 clean. Excluded. |
+| `codegen:latest` (replacement) | 20 items — `results/h2_smoke20/` | **2/20** code-content hallucinations (`factorial_00`, `count_in_range_01`). Excluded. |
+| `qwen2.5-coder:7b` (incumbent) | 20 items — `results/h2_smoke20/` | **2/20** — 1 code-content hallucination (`count_in_range_00`) + 1 evaluated-own-fix (`fibonacci_00`: correctly identifies the `a-b` defect, then judges a hypothetical *corrected* version). Excluded. |
+
+Both 20-item figures come from the **same** run, `results/h2_smoke20/`
+(`data/smoke20_wrong_operator.jsonl`, `--judge-seed 42`). Do not confuse it with
+`results/h2_smoke_codegen/`, which is a separate 5-item probe of `codegen:latest`
+on `data/smoke5_wrong_operator.jsonl`.
 
 Both parser-invisible failure modes produce syntactically valid `VERDICT: PASS/FAIL`
 tokens — `_parse_verdict` cannot see them; they are only detectable by reading the
