@@ -102,10 +102,20 @@ away; you can re-derive the tables from the logs.
 
 ### H2 — inter-family axis: **NOT COMPLETED**
 
+> ### ⚠ There is a φ in this section's artifacts. It is not an H2 result.
+>
+> `results/h2_smoke20/` contains **φ = +0.567, CI [+0.185, +0.899], n = 19,
+> verdict INCONCLUSIVE**, rendered as a table titled *"Table 3 — Judge pairs"*.
+>
+> **That number must not be cited as a measurement of the inter-family axis.**
+> It is a 20-item instrument-validation smoke run on a judge pair that *failed*
+> validation and was excluded. **No H2 measurement was ever taken** — not with
+> this pair, not with any other. The artifact is published for completeness and
+> because deleting inconvenient runs is how repositories start lying.
+
 Registered pair (Amendment 4): `qwen2.5-coder:7b` × `deepseek-coder:6.7b`.
-**No H2 measurement was ever taken.** Reason: instrument failure — every candidate
-second judge failed validation *before* measurement, so there was no reliable
-instrument to measure with.
+Reason for NOT COMPLETED: instrument failure — every candidate second judge failed
+validation *before* measurement, so there was no reliable instrument to measure with.
 
 | Candidate | Smoke run | Outcome |
 |---|---|---|
@@ -125,13 +135,9 @@ report a number.
 
 Details: [`PREREG_AMENDMENT_2026_05_31.md`](PREREG_AMENDMENT_2026_05_31.md)
 (Amendments 4 and 5), [`findings/judge_reliability_6b.md`](findings/judge_reliability_6b.md).
-Smoke artifacts: `results/h2_smoke/`, `results/h2_smoke20/`, `results/h2_smoke_codegen/`.
-
-> A φ value does appear in `results/h2_smoke20/results_all.json` (φ = +0.567,
-> CI [+0.185, +0.899], n = 19, verdict INCONCLUSIVE). **This is not an H2 result.**
-> It is an instrument-validation smoke run on a 20-item corpus with a judge pair
-> that failed validation. It is published for completeness, not as a finding, and
-> must not be cited as a measurement of the inter-family axis.
+Smoke artifacts: [`results/h2_smoke/`](results/h2_smoke/),
+[`results/h2_smoke20/`](results/h2_smoke20/) (see the warning at the top of this
+section), [`results/h2_smoke_codegen/`](results/h2_smoke_codegen/).
 
 ### H3 — cross-type axis (LLM judge × deterministic checker): **NOT EVALUABLE**
 
@@ -280,6 +286,10 @@ renaming it would break `pip install -e .`, the CLI, and every test import.
 | `results/h2_smoke_codegen/` | codegen replacement smoke |
 | `results/pilot_intra3/` | pilot that motivated `target_n_h1 = 80` (n = 10, INCONCLUSIVE by rule) |
 | `results/power_sim/` | power simulation: 160-row table, `target_n = 170` |
+
+Every non-H1 directory above carries its own `README.md` warning, because each one
+contains a table auto-titled *"Table 3 — Judge pairs"* — the same name as the
+paper's results table. Only `results/h1_wrong_operator/` holds a citable result.
 
 Not published, and why: `results/calib_smoke/` and `results/calib_real/` (calibration
 runs predating the Amendment 2 Variant B gate semantics — the stored `gate` value no
